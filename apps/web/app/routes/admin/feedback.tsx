@@ -15,7 +15,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return adminGet<AdminFeedback>(request, `/api/admin/feedback${new URL(request.url).search}`);
 }
 
-export const meta: Route.MetaFunction = () => [{ title: `反馈 · ${SITE.name} 后台` }];
+export const meta: Route.MetaFunction = () => [{ title: `Feedback · ${SITE.name} admin` }];
 
 const TONE: Record<string, "accent" | "warn" | "ok" | "muted"> = { new: "accent", triaged: "warn", replied: "ok", resolved: "ok", spam: "muted" };
 
@@ -33,55 +33,55 @@ function FeedbackCard({ f }: { f: AdminFeedbackRow }) {
         <Time at={f.created_at} />
         {f.email && <a className="text-accent" href={`mailto:${f.email}`}>{f.email}</a>}
         {f.page_url && <a className="max-w-[320px] truncate hover:text-accent" href={f.page_url} target="_blank" rel="noreferrer">{f.page_url}</a>}
-        {f.from_source > 1 && <Badge tone="info" title="同一来源（IP 与浏览器家族的不可逆标识）">同来源 {f.from_source} 条</Badge>}
-        {f.banned && <Badge tone="bad">来源已封禁</Badge>}
+        {f.from_source > 1 && <Badge tone="info" title="Same source (an irreversible ID from IP and browser family)">{f.from_source} from this source</Badge>}
+        {f.banned && <Badge tone="bad">Source banned</Badge>}
         {!f.forwarded_at && f.status === "new" && (
-          <Badge tone="warn" title={f.forward_error && f.forward_error !== "pending" ? `还没有转发到内部飞书群：${f.forward_error}` : "还没有转发到内部飞书群"}>未转发</Badge>
+          <Badge tone="warn" title={f.forward_error && f.forward_error !== "pending" ? `Not yet forwarded to the internal Feishu group: ${f.forward_error}` : "Not yet forwarded to the internal Feishu group"}>Not forwarded</Badge>
         )}
       </div>
       <p className="mt-2.5 whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{f.content}</p>
       {f.screenshot === "local" && (
         <a href={`${base}/screenshot`} target="_blank" rel="noreferrer" className="mt-2 inline-block">
-          <img src={`${base}/screenshot`} alt="反馈截图" loading="lazy" className="max-h-48 rounded-control ring-1 ring-line" />
+          <img src={`${base}/screenshot`} alt="Feedback screenshot" loading="lazy" className="max-h-48 rounded-control ring-1 ring-line" />
         </a>
       )}
-      {f.screenshot === "feishu" && <p className="mt-2 text-[12.5px] text-ink-4">截图已随反馈转到内部飞书群。</p>}
-      {f.screenshot === "gone" && <p className="mt-2 text-[12.5px] text-ink-4">截图未能转到飞书，已删除。</p>}
+      {f.screenshot === "feishu" && <p className="mt-2 text-[12.5px] text-ink-4">The screenshot was forwarded with the feedback to the internal Feishu group.</p>}
+      {f.screenshot === "gone" && <p className="mt-2 text-[12.5px] text-ink-4">The screenshot could not be forwarded to Feishu and was deleted.</p>}
       <div className="mt-3 grid gap-2 sm:grid-cols-[180px_1fr_auto] sm:items-start">
         <Select
-          aria-label="处理状态"
+          aria-label="Status"
           value={f.status}
           disabled={!!pending}
-          onChange={(e) => run("PATCH", base, { status: e.target.value, version }, { label: "status", success: "状态已更新" })}
+          onChange={(e) => run("PATCH", base, { status: e.target.value, version }, { label: "status", success: "Status updated" })}
         >
           {Object.entries(FEEDBACK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
-        <Textarea rows={1} className="!min-h-[38px]" placeholder="处理备注（仅内部可见）" value={note} onChange={(e) => setNote(e.target.value)} />
+        <Textarea rows={1} className="!min-h-[38px]" placeholder="Note (internal only)" value={note} onChange={(e) => setNote(e.target.value)} />
         <div className="flex gap-1.5">
-          <Button size="md" disabled={note === (f.note ?? "")} busy={pending === "note"} onClick={() => run("PATCH", base, { note: note || null, version }, { label: "note", success: "备注已保存" })}>
-            保存备注
+          <Button size="md" disabled={note === (f.note ?? "")} busy={pending === "note"} onClick={() => run("PATCH", base, { note: note || null, version }, { label: "note", success: "Note saved" })}>
+            Save note
           </Button>
-          <Button tone="ghost" onClick={() => setDialog(f.banned ? null : "ban")} disabled={f.banned} title="拒绝这个来源的后续反馈">封禁来源</Button>
-          <Button tone="ghost" onClick={() => setDialog("erase")} title="按隐私说明删除提交者的资料">删除资料</Button>
+          <Button tone="ghost" onClick={() => setDialog(f.banned ? null : "ban")} disabled={f.banned} title="Refuse further feedback from this source">Ban source</Button>
+          <Button tone="ghost" onClick={() => setDialog("erase")} title="Delete the submitter's data as the privacy notice says">Delete data</Button>
         </div>
       </div>
       <ReasonDialog
         open={dialog === "ban"}
-        title="封禁这个反馈来源"
-        description={`同一来源之后提交反馈会被拒绝。来源标识不可还原成 IP。${ADMIN.banNote ?? ""}`}
+        title="Ban this feedback source"
+        description={`Further feedback from this source will be refused. The source ID cannot be turned back into an IP. ${ADMIN.banNote ?? ""}`}
         danger
-        confirmLabel="封禁"
+        confirmLabel="Ban"
         onClose={() => setDialog(null)}
-        onSubmit={async (reason) => (await run("POST", "/api/admin/feedback-bans", { sourceHash: f.source_hash, reason }, { label: "ban", success: "已封禁" })) !== null}
+        onSubmit={async (reason) => (await run("POST", "/api/admin/feedback-bans", { sourceHash: f.source_hash, reason }, { label: "ban", success: "Banned" })) !== null}
       />
       <ReasonDialog
         open={dialog === "erase"}
-        title="删除提交者资料"
-        description="删除正文、邮箱、页面地址和截图，只保留处理记录。不可恢复。"
+        title="Delete the submitter's data"
+        description="Deletes the text, email, page address and screenshot, keeping only the handling record. Cannot be undone."
         danger
-        confirmLabel="删除"
+        confirmLabel="Delete"
         onClose={() => setDialog(null)}
-        onSubmit={async (reason) => (await run("POST", `${base}/erase`, { reason }, { label: "erase", success: "资料已删除" })) !== null}
+        onSubmit={async (reason) => (await run("POST", `${base}/erase`, { reason }, { label: "erase", success: "Data deleted" })) !== null}
       />
     </article>
   );
@@ -93,31 +93,31 @@ export default function FeedbackAdmin({ loaderData }: Route.ComponentProps) {
   const { run } = useAdminAction();
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   return (
-    <AdminPage title="反馈" subtitle={ADMIN.feedbackNote}>
+    <AdminPage title="Feedback" subtitle={ADMIN.feedbackNote}>
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <FilterChips
           param="status"
-          options={[{ value: "", label: "全部", count: total }, ...Object.entries(FEEDBACK_STATUS).map(([k, v]) => ({ value: k, label: v, count: counts[k] ?? 0 }))]}
+          options={[{ value: "", label: "All", count: total }, ...Object.entries(FEEDBACK_STATUS).map(([k, v]) => ({ value: k, label: v, count: counts[k] ?? 0 }))]}
         />
         <Form method="get" className="w-full max-w-xs">
           {sp.get("status") && <input type="hidden" name="status" value={sp.get("status")!} />}
-          <Input name="q" defaultValue={sp.get("q") ?? ""} placeholder="搜索内容、邮箱、页面" aria-label="搜索反馈" />
+          <Input name="q" defaultValue={sp.get("q") ?? ""} placeholder="Search text, email, page" aria-label="Search feedback" />
         </Form>
       </div>
       <div className="space-y-3">
-        {rows.length ? rows.map((f) => <FeedbackCard key={`${f.id}-${f.updated_at}`} f={f} />) : <Card><Empty>没有符合条件的反馈</Empty></Card>}
+        {rows.length ? rows.map((f) => <FeedbackCard key={`${f.id}-${f.updated_at}`} f={f} />) : <Card><Empty>No matching feedback</Empty></Card>}
       </div>
       <Pager page={page} hasMore={rows.length === 50} />
       {bans.length > 0 && (
-        <Card className="mt-8" title="已封禁的来源">
+        <Card className="mt-8" title="Banned sources">
           <ul className="space-y-2 text-[13px]">
             {bans.map((b) => (
               <li key={b.source_hash} className="flex flex-wrap items-center justify-between gap-2">
                 <span>
                   <span className="font-mono text-[12px] text-ink-3">{b.source_hash}</span> · {b.reason} · {b.created_by} · {bj(b.created_at, true)}
                 </span>
-                <Button size="sm" tone="ghost" onClick={() => run("DELETE", `/api/admin/feedback-bans/${encodeURIComponent(b.source_hash)}`, undefined, { label: `unban-${b.source_hash}`, success: "已解除封禁" })}>
-                  解除
+                <Button size="sm" tone="ghost" onClick={() => run("DELETE", `/api/admin/feedback-bans/${encodeURIComponent(b.source_hash)}`, undefined, { label: `unban-${b.source_hash}`, success: "Unbanned" })}>
+                  Unban
                 </Button>
               </li>
             ))}

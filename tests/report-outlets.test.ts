@@ -69,7 +69,7 @@ test('withdrawing a named lead preserves the replacement headline and its own fr
 
 test('a historical written daily lead follows withdrawal of the citation it describes', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 1_200_002 });
-  const removed = await citation('历史模型发布与能力升级');
+  const removed = await citation('历史Regulation与能力升级');
   const replacement = await citation('新的安全工具发布');
   const key = '2096-01-02';
   await issue('daily', key, { lead: { title: removed.title, leadParagraph: removed.summary }, highlights: [replacement.itemId], sections: [{ label: 'News', items: [removed, replacement] }] });
@@ -122,7 +122,7 @@ test('a daily citation without a frozen summary, and a flash with an earlier fro
 test('discovery counts exactly the publicly indexed topics it lists', () => {
   const text = llmsTxt({ hasDailies: false, hasWeekly: false, hasMonthly: false, topics: [{ slug: 'sample', name: 'Example', definition: 'Example topic' }], tools: [],
     modules: { api: [], pace: [], pages: [], topics: [], access: [], usage: [], guideClients: [], ways: [] } });
-  assert.match(text, /（1 个主题，下一节逐个列出）/);
+  assert.match(text, /\(1 topic, listed in the next section\)/);
 });
 
 // A saved overview/section introduction can still repeat the withdrawn citation after the list and

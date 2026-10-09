@@ -42,7 +42,7 @@ const recent = new Map<string, number[]>();
 function rateLimit(source: string, perMinute = 5): void {
   const now = Date.now();
   const list = (recent.get(source) ?? []).filter((t) => now - t < 60_000);
-  if (list.length >= perMinute) throw new FeedbackRejected(429, "rate_limited", "提交太频繁，请稍后再试。", 60);
+  if (list.length >= perMinute) throw new FeedbackRejected(429, "rate_limited", "Too many submissions; try again later.", 60);
   list.push(now);
   recent.set(source, list);
   if (recent.size > 5000) for (const [k, v] of recent) if (v.every((t) => now - t > 60_000)) recent.delete(k);
@@ -59,28 +59,28 @@ export interface FeedbackInput {
 
 export async function submitFeedback(input: FeedbackInput): Promise<{ id: number }> {
   const content = input.content.trim();
-  if (content.length < 2) throw new FeedbackRejected(400, "invalid_request", "请写下反馈内容。");
-  if (content.length > 5000) throw new FeedbackRejected(400, "invalid_request", "反馈内容最多 5000 字。");
+  if (content.length < 2) throw new FeedbackRejected(400, "invalid_request", "Please write your feedback.");
+  if (content.length > 5000) throw new FeedbackRejected(400, "invalid_request", "Feedback can be up to 5000 characters.");
   const email = input.email?.trim() || null;
-  if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new FeedbackRejected(400, "invalid_request", "邮箱格式不正确。");
+  if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new FeedbackRejected(400, "invalid_request", "The email address is not valid.");
   const pageUrl = input.pageUrl?.trim().slice(0, 500) || null;
   const source = feedbackSourceHash(input.ip, input.userAgent);
   // A ban holds under every key the source is known by.
   const keys = [source, ...serverModules().flatMap((m) => m.feedbackKeys?.(input.ip) ?? [])];
   const [banned] = await sql`SELECT 1 FROM feedback_bans WHERE source_hash IN ${sql(keys)}`;
-  if (banned) throw new FeedbackRejected(403, "forbidden", "暂时无法提交反馈。");
+  if (banned) throw new FeedbackRejected(403, "forbidden", "Feedback can't be sent right now.");
   rateLimit(source);
 
   let screenshotKey: string | null = null;
   if (input.screenshot) {
     // Some phones send JPEGs as image/jpg or with no type at all: the bytes decide.
     const mime = sniffImageType(input.screenshot.data);
-    if (!mime) throw new FeedbackRejected(400, "invalid_request", "截图需要是 PNG、JPG、WebP 或 GIF。");
-    if (input.screenshot.data.length > 8 * 1024 * 1024) throw new FeedbackRejected(400, "invalid_request", "截图最大 8MB。");
+    if (!mime) throw new FeedbackRejected(400, "invalid_request", "Screenshots must be PNG, JPG, WebP or GIF.");
+    if (input.screenshot.data.length > 8 * 1024 * 1024) throw new FeedbackRejected(400, "invalid_request", "Screenshots can be up to 8 MB.");
     // The first bytes are not enough: a PNG signature followed by noise would be kept and offered to
     // Feishu again and again. Decoding the whole picture settles it (a long phone capture fits the cap).
     const decodes = await sharp(input.screenshot.data, { limitInputPixels: 60_000_000, failOn: "error" }).stats().then(() => true, () => false);
-    if (!decodes) throw new FeedbackRejected(400, "invalid_request", "截图无法识别，请换一张图片。");
+    if (!decodes) throw new FeedbackRejected(400, "invalid_request", "The screenshot can't be read; try another image.");
     // Stored locally until it is forwarded (notify/feishu.ts), for good where there is no internal chat;
     // the database keeps only an identifier.
     // Forwarding or erasing one feedback removes its file, even if another used the same picture.

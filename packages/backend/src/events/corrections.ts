@@ -55,7 +55,7 @@ export async function moveToFact(id: string, factPublicId: string, reason: strin
     if (!article) return null;
     const [target] = await tx<{ id: number; story_id: number }[]>`
       SELECT f.id, f.story_id FROM facts f JOIN stories st ON st.id = f.story_id WHERE f.public_id = ${factPublicId} AND st.merged_into IS NULL`;
-    if (!target) throw new Conflict("目标事实不存在，或它所在的事件已被合并");
+    if (!target) throw new Conflict("The target fact doesn't exist, or its event has been merged");
     const removed = await tx<{ fact_id: number; evidence: string | null }[]>`
       DELETE FROM fact_articles WHERE article_id = ${id} AND (role IN ('primary', 'report') OR fact_id = ${target.id}) RETURNING fact_id, evidence`;
     const facts = removed.map((r) => Number(r.fact_id)).filter((factId) => factId !== Number(target.id));
@@ -95,7 +95,7 @@ export async function mergeStories(fromId: number, intoId: number, reason: strin
   if (done) return done;
   const found = await sql<{ id: number }[]>`SELECT id FROM stories WHERE id IN (${fromId}, ${intoId})`;
   if (found.length < 2) throw new Error("story not found");
-  throw new Conflict("两个事件都必须是未合并的事件");
+  throw new Conflict("Both events must be unmerged");
 }
 
 /**

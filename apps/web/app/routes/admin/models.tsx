@@ -16,15 +16,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   return adminGet<AdminModels>(request, `/api/admin/models?days=${encodeURIComponent(days)}`);
 }
 
-export const meta: Route.MetaFunction = () => [{ title: `模型与评测 · ${SITE.name} 后台` }];
+export const meta: Route.MetaFunction = () => [{ title: `Models & evals · ${SITE.name} admin` }];
 
-const SOURCE_LABEL = { admin: "后台切换", env: "环境变量", default: "代码默认" } as const;
+const SOURCE_LABEL = { admin: "Admin switch", env: "Environment", default: "Code default" } as const;
 
 /** A cost the provider did not report and no price covers: a link to the prices when a module keeps them. */
 function Unpriced() {
   const prices = webModules().find((m) => m.admin?.prices)?.admin?.prices;
-  if (prices) return <Link to={prices} className="whitespace-nowrap text-ink-4 hover:text-accent">未定价</Link>;
-  return <span className="whitespace-nowrap text-ink-4" title="服务商没有返回费用，按 token 数和你的模型单价自己估算">未定价</span>;
+  if (prices) return <Link to={prices} className="whitespace-nowrap text-ink-4 hover:text-accent">No price</Link>;
+  return <span className="whitespace-nowrap text-ink-4" title="The provider returned no cost; estimate it from tokens and your model's price">No price</span>;
 }
 const secs = (ms: number | null) => (ms == null ? "—" : ms >= 10_000 ? `${Math.round(ms / 1000)} s` : `${(ms / 1000).toFixed(1)} s`);
 
@@ -36,9 +36,9 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
 
   return (
     <AdminPage
-      title="模型与评测"
-      subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看 SelectBench 同批对比。"
-      actions={<FilterChips param="days" options={[{ value: "1", label: "24 小时" }, { value: "", label: "7 天" }, { value: "30", label: "30 天" }]} />}
+      title="Models & evals"
+      subtitle="Which model each step uses and where the choice comes from (admin switch > environment > code default), with recent success rate, latency and cost. A switch affects only new jobs; existing results are not recomputed. Before changing the selection model, compare on SelectBench."
+      actions={<FilterChips param="days" options={[{ value: "1", label: "24 hours" }, { value: "", label: "7 days" }, { value: "30", label: "30 days" }]} />}
     >
       <div className="grid grid-cols-1 gap-5">
         {m.capabilities.map((c) => {
@@ -61,7 +61,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
                     setChoice(c.current.model);
                   }}
                 >
-                  切换
+                  Switch
                 </Button>
               }
               pad={false}
@@ -72,30 +72,30 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
                   rows={c.usage}
                   rowKey={(u) => `${u.purpose}|${u.model}|${u.promptVersion}`}
                   columns={[
-                    { key: "m", label: "模型", render: (u) => <span className="whitespace-nowrap font-mono text-[12px]">{u.model}</span> },
-                    { key: "v", label: "提示版本", render: (u) => <span className="whitespace-nowrap font-mono text-[11.5px] text-ink-3">{u.promptVersion ?? "—"}</span> },
-                    { key: "p", label: "用途", render: (u) => <span className="whitespace-nowrap font-mono text-[11.5px] text-ink-3">{u.purpose}</span> },
-                    { key: "c", label: "调用", align: "right", render: (u) => num(u.calls) },
+                    { key: "m", label: "Model", render: (u) => <span className="whitespace-nowrap font-mono text-[12px]">{u.model}</span> },
+                    { key: "v", label: "Prompt version", render: (u) => <span className="whitespace-nowrap font-mono text-[11.5px] text-ink-3">{u.promptVersion ?? "—"}</span> },
+                    { key: "p", label: "Purpose", render: (u) => <span className="whitespace-nowrap font-mono text-[11.5px] text-ink-3">{u.purpose}</span> },
+                    { key: "c", label: "Calls", align: "right", render: (u) => num(u.calls) },
                     {
                       key: "ok",
-                      label: "成功率",
+                      label: "Success",
                       align: "right",
                       render: (u) => {
                         const rate = u.calls ? u.ok / u.calls : 0;
-                        return <span className={rate < 0.95 ? "text-hot" : ""} title={`失败 ${u.failed} · 结果未知 ${u.unknown}`}>{`${Math.round(rate * 1000) / 10}%`}</span>;
+                        return <span className={rate < 0.95 ? "text-hot" : ""} title={`Failed ${u.failed} · unknown ${u.unknown}`}>{`${Math.round(rate * 1000) / 10}%`}</span>;
                       },
                     },
-                    { key: "l", label: "耗时 p50 / p95", align: "right", render: (u) => <span className="whitespace-nowrap">{`${secs(u.p50)} / ${secs(u.p95)}`}</span> },
-                    { key: "t", label: "输入 / 输出 token", align: "right", render: (u) => <span className="whitespace-nowrap">{`${num(u.tokensIn)} / ${num(u.tokensOut)}`}</span> },
+                    { key: "l", label: "Latency p50 / p95", align: "right", render: (u) => <span className="whitespace-nowrap">{`${secs(u.p50)} / ${secs(u.p95)}`}</span> },
+                    { key: "t", label: "Input / output tokens", align: "right", render: (u) => <span className="whitespace-nowrap">{`${num(u.tokensIn)} / ${num(u.tokensOut)}`}</span> },
                     {
                       key: "$",
-                      label: "费用",
+                      label: "Cost",
                       align: "right",
                       render: (u) =>
                         u.actualCost !== null ? (
                           `${money(u.actualCost)}${u.currency && u.currency !== "CNY" ? ` ${u.currency}` : ""}`
                         ) : u.estimate ? (
-                          <span title="按用量 × 单价推算">≈ {money(u.estimate.amount)}{u.estimate.currency !== "CNY" ? ` ${u.estimate.currency}` : ""}</span>
+                          <span title="Usage × unit price">≈ {money(u.estimate.amount)}{u.estimate.currency !== "CNY" ? ` ${u.estimate.currency}` : ""}</span>
                         ) : (
                           <Unpriced />
                         ),
@@ -103,7 +103,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
                   ]}
                 />
               ) : (
-                <Empty>{m.days} 天内没有调用{total === 0 && c.vision ? "（只在有图片时使用）" : ""}</Empty>
+                <Empty>No calls in {m.days} days{total === 0 && c.vision ? " (used only with images)" : ""}</Empty>
               )}
             </Card>
           );
@@ -111,64 +111,64 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Card title="切换记录" pad={false}>
+        <Card title="Switch history" pad={false}>
           {m.history.length ? (
             <DataTable
               dense
               rows={m.history}
               rowKey={(h) => `${h.at}|${h.subject}`}
               columns={[
-                { key: "at", label: "时间", render: (h) => <span className="num whitespace-nowrap">{bj(h.at)}</span> },
-                { key: "c", label: "能力", render: (h) => labelOf(h.subject) },
-                { key: "m", label: "变化", render: (h) => <span className="font-mono text-[12px]">{h.before?.model ?? "—"} → {h.after?.model ?? "—"}</span> },
-                { key: "r", label: "原因", render: (h) => <span className="text-ink-3">{h.reason}</span> },
-                { key: "a", label: "操作人", render: (h) => h.actor },
+                { key: "at", label: "Time", render: (h) => <span className="num whitespace-nowrap">{bj(h.at)}</span> },
+                { key: "c", label: "Step", render: (h) => labelOf(h.subject) },
+                { key: "m", label: "Change", render: (h) => <span className="font-mono text-[12px]">{h.before?.model ?? "—"} → {h.after?.model ?? "—"}</span> },
+                { key: "r", label: "Reason", render: (h) => <span className="text-ink-3">{h.reason}</span> },
+                { key: "a", label: "By", render: (h) => h.actor },
               ]}
             />
           ) : (
-            <Empty>还没有在后台切换过模型</Empty>
+            <Empty>No model switches in the admin yet</Empty>
           )}
         </Card>
-        <Card title="同批样本对比（SelectBench）" right={<Link to="/admin/selectbench" className="text-accent">全部运行</Link>} pad={false}>
+        <Card title="Same-sample comparison (SelectBench)" right={<Link to="/admin/selectbench" className="text-accent">All runs</Link>} pad={false}>
           {m.benches.length ? (
             <DataTable
               dense
               rows={m.benches}
               rowKey={(b) => b.id}
               columns={[
-                { key: "l", label: "运行", render: (b) => <Link to={`/admin/selectbench/${b.id}`} className="text-ink hover:text-accent">{b.label}</Link> },
-                { key: "m", label: "模型", render: (b) => <span className="font-mono text-[11.5px] text-ink-3">{b.models.join("、")}</span> },
-                { key: "n", label: "样本", align: "right", render: (b) => num(b.sample_size) },
-                { key: "at", label: "时间", render: (b) => <span className="num whitespace-nowrap">{bj(b.created_at)}</span> },
+                { key: "l", label: "Run", render: (b) => <Link to={`/admin/selectbench/${b.id}`} className="text-ink hover:text-accent">{b.label}</Link> },
+                { key: "m", label: "Models", render: (b) => <span className="font-mono text-[11.5px] text-ink-3">{b.models.join(", ")}</span> },
+                { key: "n", label: "Cases", align: "right", render: (b) => num(b.sample_size) },
+                { key: "at", label: "Time", render: (b) => <span className="num whitespace-nowrap">{bj(b.created_at)}</span> },
               ]}
             />
           ) : (
-            <Empty>还没有导入对比运行</Empty>
+            <Empty>No comparison runs imported yet</Empty>
           )}
         </Card>
       </div>
 
       <ReasonDialog
         open={!!target}
-        title={`切换模型：${target?.label ?? ""}`}
-        description="只影响之后的新任务。选“恢复默认”会回到环境变量或代码默认。"
-        confirmLabel="切换"
+        title={`Switch model: ${target?.label ?? ""}`}
+        description="Affects only new jobs. “Restore default” goes back to the environment or code default."
+        confirmLabel="Switch"
         busy={pending === "switch"}
         onClose={() => setTarget(null)}
         onSubmit={async (reason) =>
-          (await run("POST", `/api/admin/models/${target!.key}`, { model: choice === "__default" ? null : choice, reason }, { label: "switch", success: "已切换，下一次调用生效" })) !== null
+          (await run("POST", `/api/admin/models/${target!.key}`, { model: choice === "__default" ? null : choice, reason }, { label: "switch", success: "Switched; takes effect on the next call" })) !== null
         }
       >
-        <Field label="模型">
+        <Field label="Model">
           <Select value={choice} onChange={(e) => setChoice(e.target.value)}>
             {m.choices
               .filter((x) => !target?.vision || x.vision)
               .map((x) => (
                 <option key={x.key} value={x.key}>
-                  {x.key}（{x.service}）
+                  {x.key} ({x.service})
                 </option>
               ))}
-            <option value="__default">恢复默认（{target?.env} 或 {target?.defaultModel}）</option>
+            <option value="__default">Restore default ({target?.env} or {target?.defaultModel})</option>
           </Select>
         </Field>
       </ReasonDialog>

@@ -74,10 +74,12 @@ async function saveReport(kind: ReportKind, key: string, start: Date, end: Date,
   });
 }
 
-/** "10 月 4 日 08:00": one end of a quiet issue's window, as its lead paragraph names it. */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Oct 4 07:00": one end of a quiet issue's window, as its lead paragraph names it. */
 function windowPoint(at: Date): string {
   const day = beijingDate(at);
-  return `${Number(day.slice(5, 7))} 月 ${Number(day.slice(8, 10))} 日 ${beijingTime(at)}`;
+  return `${MONTHS[Number(day.slice(5, 7)) - 1]} ${Number(day.slice(8, 10))} ${beijingTime(at)}`;
 }
 
 /**
@@ -121,12 +123,12 @@ const PERIOD_EVENTS = { weekly: 20, monthly: 30 } as const;
 /** A section is introduced once it carries this many events; one or two are read faster than introduced. */
 const INTRO_EVENTS = 3;
 /** The longest overview and introduction an issue prints; the brief asks for less, writers overshoot. */
-const OVERVIEW_CHARS = { weekly: 240, monthly: 340 } as const;
-const INTRO_CHARS = 90;
+const OVERVIEW_CHARS = { weekly: 700, monthly: 1000 } as const;
+const INTRO_CHARS = 280;
 /** The brief's values for each kind: its name, its span and how long its overview should be. */
 const BRIEF = {
-  weekly: { kindName: "周报", span: "一周", sentences: "三句话", chars: "160" },
-  monthly: { kindName: "月报", span: "个月", sentences: "三到四句话", chars: "240" },
+  weekly: { kindName: "weekly", span: "week", sentences: "three sentences", chars: "500" },
+  monthly: { kindName: "monthly", span: "month", sentences: "three or four sentences", chars: "700" },
 } as const;
 
 export const PeriodSchema = z.object({
@@ -140,15 +142,15 @@ export const PeriodSchema = z.object({
  * what the issue carries.
  */
 export function periodPrompt(kind: "weekly" | "monthly", startDate: string, endDateInclusive: string, groups: Array<{ label: string; items: Candidate[] }>) {
-  const list = groups.map((g) => [`【${g.label}】`, ...g.items.map((e) => `- ${e.title}｜${e.summary.slice(0, 140)}`)].join("\n")).join("\n");
+  const list = groups.map((g) => [`[${g.label}]`, ...g.items.map((e) => `- ${e.title} | ${e.summary.slice(0, 400)}`)].join("\n")).join("\n");
   const introduced = groups.filter((g) => g.items.length >= INTRO_EVENTS).map((g) => g.label);
   return {
     system: promptText("report-period", {
       ...BRIEF[kind],
-      sections: introduced.length ? promptText("report-period-sections", { columns: introduced.map((l) => `「${l}」`).join("") }) : promptText("report-period-no-sections"),
+      sections: introduced.length ? promptText("report-period-sections", { columns: introduced.map((l) => `"${l}"`).join(", ") }) : promptText("report-period-no-sections"),
       sectionsExample: introduced.length ? `{"${introduced[0]}": "..."}` : "{}",
     }),
-    user: `本期：${startDate} 至 ${endDateInclusive}\n${list}`,
+    user: `This issue: ${startDate} to ${endDateInclusive}\n${list}`,
   };
 }
 
@@ -175,12 +177,16 @@ export function grounded(text: string, corpus: string): boolean {
 
 /** The leading whole sentences of a text that fit in `max` characters; null when not even the first does. */
 export function fitted(text: string, max: number): string | null {
+  const t = text.trim();
+  // A sentence ends at a Chinese full stop, or at . ! ? before a space and a capital or digit ("U.S. tariffs" stays whole).
+  const ends = [...t.matchAll(/[。！？]+[」”’）]*|[.!?]+["”’)]?(?=\s+["“(]?[A-Z0-9]|\s*$)/g)].map((m) => m.index + m[0].length);
   let out = "";
-  for (const sentence of text.trim().match(/[^。！？]+(?:[。！？]+[」”’）]*|$)/g) ?? []) {
-    if ([...out + sentence].length > max) break;
-    out += sentence;
+  for (const end of [...ends, t.length]) {
+    const candidate = t.slice(0, end).trim();
+    if ([...candidate].length > max) break;
+    out = candidate;
   }
-  return out.trim() || null;
+  return out || null;
 }
 
 /**
@@ -228,7 +234,7 @@ async function composePeriod(kind: "weekly" | "monthly", key: string, startDate:
   const [lead] = top as [Candidate, ...Candidate[]];
   const content = {
     kind,
-    title: kind === "weekly" ? `${SITE.name} 周报 · ${key}` : `${SITE.name} 月报 · ${key}`,
+    title: kind === "weekly" ? `${SITE.name} Weekly · ${key}` : `${SITE.name} Monthly · ${key}`,
     ...(kind === "weekly" ? { isoLabel: key } : { monthLabel: key }),
     periodStart: startDate,
     periodEnd: endDateInclusive,

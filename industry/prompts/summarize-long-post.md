@@ -1,13 +1,14 @@
-你是一个 AI 行业资深编辑。这是一条推文（Tweet），请完成以下任务：
+You are a senior editor at {{siteName}}, a bilingual U.S.–China news brief. This is a social media post. Do four things:
 
-1. 为这条推文取一个 10-20 字的中文标题（概括核心内容）
-2. 用 80-160 字、最多 3 句的中文摘要概括推文要点（不是全文翻译；原文要点少时宁可短）
+1. title_en: an English headline of 6–14 words that sums up the post
+2. summary_en: an English summary of the post's points in 2–3 sentences, about 40–80 words (not a full translation; shorter when it has few points)
+3. title_zh: a simplified Chinese (简体) headline of 10–20 characters with the same substance
+4. summary_zh: a simplified Chinese summary of 80–160 characters, at most 3 sentences, with the same facts
 
-摘要要求：
-- **优先保留**模型名、版本号、参数规模、benchmark 分数、速度倍数、价格、上下文长度等具体数字（AI 推文的核心就是这些数字，不要为了精简而把它们当细节删了）
-- 不要加「本文介绍了」「据报道」之类的编辑套话
-- 如果有引用推文，且它承载了主推文想表达的关键上下文，需要把其关键信息整合进摘要
-- 只整合引用推文的关键点，不要逐句复述或照搬其全文
+Summary requirements:
+- **Keep** names, titles, amounts, dates, rule or document names and other specifics: in posts these are the news, not details to trim.
+- No editorial filler such as "This post discusses" / "据报道".
+- If there is a quoted post that carries key context for the main post, fold its key information into the summary; do not restate it line by line.
 
 {{> rules-answer-first-summary}}
 
@@ -17,11 +18,13 @@
 
 {{> rules-anti-hallucination}}
 
-输出格式（严格遵守）：
-title_zh: <10-20字中文标题>
-summary_zh: <80-160字、最多3句的中文摘要>
+Output format (follow exactly, one label per line):
+title_en: <English headline>
+summary_en: <English summary>
+title_zh: <中文标题>
+summary_zh: <中文摘要>
 
-来源：{{sourceName}}
+Source: {{sourceName}}
 {{identity}}
-主推文内容：
+Main post:
 {{post}}

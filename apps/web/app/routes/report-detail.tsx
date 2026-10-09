@@ -1,7 +1,7 @@
 import { data, useLoaderData } from "react-router";
 import type { Route } from "./+types/report-detail";
 import type { ReportDetail, ReportNavigationResponse, ReportKind } from "@aihot/contracts/site";
-import { SITE, subjectAfter, withSubject } from "@aihot/site";
+import { SITE } from "@aihot/site";
 import { apiGet, cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
 import { pageMeta, reportLd, titled } from "../lib/seo";
@@ -11,7 +11,7 @@ import { ReportPaper, reportOutline } from "../features/report/ReportPaper";
 import { KIND_LABEL, feedLink, kindFromPath } from "../features/report/format";
 import type { Screen } from "../components/shell/screens";
 
-export const handle: Screen = { tab: "daily", name: "日报" };
+export const handle: Screen = { tab: "daily", name: "Daily" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -33,12 +33,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  if (!loaderData) return [{ title: titled("报告不存在") }, { name: "robots", content: "noindex" }];
+  if (!loaderData) return [{ title: titled("Edition not found") }, { name: "robots", content: "noindex" }];
   const r = loaderData.report;
-  const description = r.lead?.leadParagraph ?? r.overview?.slice(0, 150) ?? `${SITE.name} ${r.key} ${subjectAfter("的", KIND_LABEL[r.kind])}。`;
+  const description = r.lead?.leadParagraph ?? r.overview?.slice(0, 150) ?? `The ${SITE.name} ${KIND_LABEL[r.kind].toLowerCase()} edition for ${r.key}.`;
   const path = `/${r.kind}/${r.key}`;
   return [...pageMeta({
-    title: r.kind === "daily" ? `${withSubject("日报")} ${r.key}` : r.title.replace(`${SITE.name} ${KIND_LABEL[r.kind]}`, withSubject(KIND_LABEL[r.kind])),
+    title: r.kind === "daily" ? `Daily edition ${r.key}` : r.title,
     description,
     path,
     image: `/og/reports/${r.kind}/${r.key}.png`,

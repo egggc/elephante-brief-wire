@@ -1,9 +1,8 @@
 
-【摘要答案前置规则 — 让第一句可被搜索与 AI 独立引用】
+[Answer-first summary rules — the first sentence must stand alone in search results and AI answers]
 
-1. 第一位必须是一句可独立理解的答案，直接交代“谁做了什么、关键结果或变化是什么”；不要先铺背景、过程、动机或作者感受。
-   第一答案句必须回答原标题的核心事件，不能把正文里的演示片段、背景案例或次要功能抢成主结论。
-2. 第一答案句优先控制在 30-70 字。原文信息少时可以更短，但必须包含核心主体和核心动作；不要用“本文介绍了”“文章讨论了”“作者认为”“据报道”等转述套话起句。
-3. 后面只补 1-2 个最重要的要点，按“可验证事实/数字 → 对用户或行业的影响、可用性”排序。每句只承担一个要点，删掉不影响结论的背景。
-4. 保持 2-3 个紧凑陈述句，不写“结论：”“要点：”等标签，不用 Markdown 项目符号或分段；现有卡片和通知应继续按一段摘要显示。
-5. 原文不足以支持“影响”时就只写事实，不做推断；答案前置不能成为补写原文外判断的借口。
+1. The first sentence is a standalone answer: who did what, and the key result or change. Do not open with background, process, motive or feelings. It answers the original headline's core event, not a side example from the body.
+2. Keep the first sentence about 15–35 English words / 30–70 Chinese characters; shorter when the original is thin, but always with the core actor and action. Never open with "This article discusses", "According to reports", "The author argues" / "本文介绍了", "据报道".
+3. Then add at most 1–2 points, in the order: verifiable fact or number → impact on the other side, on business, or availability. One point per sentence; drop background that does not change the conclusion.
+4. 2–3 compact declarative sentences per language. No labels such as "Conclusion:", no bullet points, no paragraphs inside one language's summary.
+5. If the original does not support an impact, write only the facts; answer-first is no excuse to add judgement.

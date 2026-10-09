@@ -117,7 +117,7 @@ test("another source listing the same article records a discovery, not a revisio
 
 test("an article linking to a tweet is stored separately from the tweet", async () => {
   const tweetId = `${Date.now()}123456`;
-  const url = `https://x.com/openai/status/${tweetId}`;
+  const url = `https://x.com/nvidia/status/${tweetId}`;
   const tweet = await upsertMaterial({ sourceId: SOURCE, url, title: "Original tweet", via: "fetch" });
   const article = await upsertMaterial({
     sourceId: OTHER, url: `https://example.com/report-${tag()}?related=${url}`, title: "Independent report", via: "fetch",
@@ -127,7 +127,7 @@ test("an article linking to a tweet is stored separately from the tweet", async 
   assert.equal((await state(tweet.articleId)).title, "Original tweet");
   assert.equal((await state(article.articleId)).title, "Independent report");
   const alias = await upsertMaterial({
-    sourceId: OTHER, url: `https://twitter.com/openai/status/${tweetId}`, title: "Tweet alias", via: "fetch",
+    sourceId: OTHER, url: `https://twitter.com/nvidia/status/${tweetId}`, title: "Tweet alias", via: "fetch",
   });
   assert.equal(alias.created, false);
   assert.equal(alias.articleId, tweet.articleId);

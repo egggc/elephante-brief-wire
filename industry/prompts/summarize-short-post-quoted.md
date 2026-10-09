@@ -1,3 +1,3 @@
-引用式 teaser 例外：若主推文几乎没有信息量（纯感叹 / 转发 / 号召，如「Go build!」「活久见」），而下面这条引用推文才是真正的新闻，则 body_zh 改为用一两句话概括【引用推文】的核心要点，让正文和标题对得上（别只输出一句空洞的主推文），可在结尾带一句主推文的简短反应；其余情况仍然只翻译主推文。
-{{quotedLabel}}（仅供理解上下文；按上面的「引用式 teaser 例外」判断要不要概括它）：
+Quoted-teaser exception: if the main post carries almost no information (an exclamation, a bare repost, a call to action such as "Go build!") and the quoted post below is the real news, then body_en and body_zh instead sum up the quoted post's core point in one or two sentences, so body and headline match (do not output only an empty main post); you may end with the main post's brief reaction. Otherwise translate only the main post.
+{{quotedLabel}} (only for understanding the context; use the quoted-teaser exception above to decide whether to sum it up):
 {{quotedText}}

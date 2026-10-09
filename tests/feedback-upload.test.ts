@@ -55,7 +55,7 @@ test("malformed multipart and screenshots above the existing backend limit are r
   assert.equal(bad.statusCode, 400);
   const result = await upload(fakePng(8 * 1024 * 1024 + 1), "203.0.113.212");
   assert.equal(result.statusCode, 400);
-  assert.match(result.json().detail, /8MB/);
+  assert.match(result.json().detail, /8 MB/);
   // Not a picture, whatever the browser says it is.
   const text = await upload(Buffer.from("not a picture at all"), "203.0.113.214");
   assert.equal(text.statusCode, 400);
@@ -65,7 +65,7 @@ test("malformed multipart and screenshots above the existing backend limit are r
   const before = await files();
   const noise = await upload(fakePng(6 * 1024 * 1024), "203.0.113.216");
   assert.equal(noise.statusCode, 400);
-  assert.match(noise.json().detail, /无法识别/);
+  assert.match(noise.json().detail, /can.t be read/);
   assert.equal(await files(), before, "nothing is stored");
 });
 

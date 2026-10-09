@@ -1,45 +1,15 @@
 
-【AI 领域翻译规则 — 本平台 100% 是 AI/ML/LLM 行业内容，严格遵守】
+[U.S.–China terminology rules — follow strictly in both languages]
 
-1. 歧义默认值：以下词在中文有非 AI 歧义，**一律按 AI 含义翻译**：
-   - LLM = 大语言模型（绝不译"法学硕士"/"Master of Laws"）
-   - Token / tokens = 模型 token（保留英文；绝不译"代币"/"令牌"）
-   - Transformer = Transformer 架构（保留英文；不译"变压器"）
-   - Diffusion = 扩散模型（AI 生成，不是物理扩散）
-   - Agent / Agentic = AI 智能体 / 智能体的（不译"代理人"/"中介"）
-   - Alignment = 对齐（AI 安全语境）
-   - Inference = 推理（模型生成）
-   - Reasoning = 推理（注意：与 inference 都译"推理"，必要时用"链式推理"区分 CoT；reasoning model 指 o1/o3/R1 这类思考型模型）
-   - Embedding = 嵌入向量（也可保留英文）
-   - Distillation = 知识蒸馏
-   - Hallucination = 模型幻觉
-   - Fine-tune / Fine-tuning = 微调
-   - Pretrain / Pretraining = 预训练
-   - Context window = 上下文窗口
-   - Prompt = 提示词
-   - Skill / Skills = 技能（Claude 等 Agent 框架的能力包，不译"特长"）
-
-2. 以下专有名词**一律保留英文原文**，不翻译不加中文括注：
-   - AI 公司：OpenAI / Anthropic / Google DeepMind / xAI / Meta AI / Mistral / DeepSeek / Cohere / HuggingFace（HF）/ Runway / ElevenLabs / Suno / Pika / Midjourney / Perplexity
-   - 模型族（举例 + 通用规则）：GPT / Claude / Gemini / Llama / Qwen / Grok / o 系列 / DeepSeek / Mistral / Mixtral / Phi / Sora / Veo / Imagen
-     **规则**：任何大模型族名、产品代号一律保留英文
-   - 模型版本号（举例 + 通用规则）：GPT-5 / Claude 4.7 / Claude Sonnet 4.6 / Llama 4 / Gemini 3 / o3 / o4 / DeepSeek-V4 / Qwen3.7
-     **规则**：版本号一字不改（包括字母数字后缀如 4o / 4.7 / 405B / V4 / R1），绝不"翻译性扩写"（不要把 "405B" 译成 "4050 亿"，不要把 "V4" 译成 "第 4 代"）
-   - 技术缩写（举例 + 通用规则）：LLM / RAG / RLHF / DPO / LoRA / QLoRA / PEFT / MoE / CoT / ReAct / KV cache / SOTA / AGI / MCP / ADK / NPU / GPU / TPU
-     **规则**：任何 2-5 字母的全大写缩写，默认按 AI/ML 含义保留英文
-   - 评测基准（举例 + 通用规则）：MMLU / GPQA / HumanEval / SWE-bench / SWE-bench Verified / AIME / HLE / ARC-AGI / ARC-AGI 2 / MT-Bench / Chatbot Arena / Aider Polyglot / LiveCodeBench
-     **规则**：以 -bench / -eval 结尾或全大写的评测名一律保留英文
-   - AI 工具/产品：Cursor / Copilot / Codex / Aider / Devin / Cline / Claude Code / Windsurf / Zed / v0 / Bolt / Lovable / Replit Agent
-   - Agent 框架：LangChain / LangGraph / LlamaIndex / CrewAI / AutoGen / Pydantic AI / Vercel AI SDK / DSPy
-   - 推理/部署：Ollama / vLLM / SGLang / TensorRT / Triton / CUDA / ROCm
-   - 通用技术：API / SDK / CLI / IDE / SaaS / CDN / SSO / OAuth / JWT / WebSocket / SSE / gRPC
-
-3. 中国厂商**优先用官方中文品牌名**（首次出现可双标"千问（Qwen3）"，后续选一种保持一致）：
-   - 千问（Qwen）/ 文心一言 / 智谱（GLM）/ 月之暗面（Kimi）/ 深度求索（DeepSeek）/ 阶跃星辰（Step）/ 零一万物（Yi）/ 百川 / 豆包（字节）/ 混元（腾讯）/ 可灵（Kling，快手）/ 即梦（Jimeng，字节）/ MiniMax（不译）/ 美团 LongCat / 昆仑万维 Skywork / 面壁 MiniCPM / 华为昇腾 / 寒武纪
-
-4. 代码 / 命令 / URL / 数字单位 **一字不改**保留：
-   - 反引号代码 `code` 不翻译
-   - 命令如 /code-review、pip install、npm run 不译（不要译"代码审查"）
-   - URL 原样
-   - 数字+单位：8k context / 175B params / 3.5x speedup / $3 per M tokens / 99.9%
-   - 金额、参数量、比例、区间必须保留原文的阿拉伯数字和单位；不要把 $10B-$100B 改写成“数百亿至数千亿美元”等中文数量词
+1. Institutions: use the standard name in each language and keep it consistent.
+   - China: State Council 国务院; Ministry of Commerce (MOFCOM) 商务部; National Development and Reform Commission (NDRC) 国家发展改革委; People's Bank of China (PBOC) 中国人民银行; China Securities Regulatory Commission (CSRC) 中国证监会; Cyberspace Administration of China (CAC) 国家网信办; State Administration for Market Regulation (SAMR) 国家市场监管总局; Ministry of Foreign Affairs 外交部; National People's Congress (NPC) 全国人大; Politburo 中央政治局.
+   - United States: Commerce Department and its Bureau of Industry and Security (BIS) 美国商务部 / 工业与安全局; Treasury 美国财政部; Office of the U.S. Trade Representative (USTR) 美国贸易代表办公室; Securities and Exchange Commission (SEC) 美国证券交易委员会; Federal Reserve 美联储; Committee on Foreign Investment in the United States (CFIUS) 美国外国投资委员会; Congress 美国国会; the White House 白宫.
+2. Terms with a fixed meaning in this field (do not paraphrase them away):
+   - entity list 实体清单; export controls 出口管制; tariffs 关税; sanctions 制裁; de minimis 小额豁免; outbound investment 对外投资; delisting 退市; Hong Kong listing 港股上市; yuan / renminbi (RMB, CNY; offshore CNH) 人民币.
+   - Chinese policy phrases: keep the official English rendering when one exists ("common prosperity" 共同富裕, "new quality productive forces" 新质生产力, "dual circulation" 双循环), and do not invent an English slogan for a phrase that has none: describe it plainly instead.
+3. People: Chinese names in pinyin with family name first (Xi Jinping, Li Qiang, Wang Yi), in Chinese characters in Chinese; U.S. names in their usual English form and the common Chinese transliteration in Chinese (特朗普, 鲁比奥) only when it is standard; otherwise keep the Latin name.
+4. Companies, products, brands, films and songs: the name each market knows. In English: Huawei, Tencent, ByteDance, Pop Mart; in Chinese: 华为、腾讯、字节跳动、泡泡玛特. Western companies in Chinese use the established name (苹果、英伟达、特斯拉、星巴克); keep Latin names that have no common Chinese form. Film and song titles keep the official title in each language when one exists.
+5. Places: Taiwan 台湾, Hong Kong 香港, the Taiwan Strait 台湾海峡, South China Sea 南海. Use the naming the material uses for disputed status; do not add or remove political framing.
+6. Code, commands, URLs and numbers stay exactly as written:
+   - Amounts, percentages, quantities, ranges and units keep Arabic numerals and the original currency (US$10 billion / 100亿美元, 3.2%, ¥5,000). Convert units of counting between languages correctly (1 billion = 10亿; 100 million = 1亿) and never round or change the magnitude.
+   - Dates keep the precision the original gives; do not add a year it does not state.

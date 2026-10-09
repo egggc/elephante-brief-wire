@@ -5,10 +5,17 @@ import { beijingAt } from "@aihot/contracts/time";
 import { closeDb, sql } from "@aihot/backend/db";
 import { getBoss, stopBoss } from "@aihot/backend/jobs/queue";
 import { checkAlerts, collectFindings } from "@aihot/backend/operations/alerts";
+import { EDITION_TIMES } from "@aihot/site";
 
 const at = (date: string, time = "10:00") => beijingAt(date, time).getTime();
 const key = (date: string) => `report.daily:${date}`;
 const daily = (keys: string[]) => keys.filter(k => k.startsWith("report.daily"));
+/** A minute before a daily counts as missing (two hours after the site's edition time). */
+const beforeDue = (() => {
+  const [h, m] = EDITION_TIMES.daily.split(":").map(Number) as [number, number];
+  const t = h * 60 + m + 119;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+})();
 async function report(date: string) {
   await sql`INSERT INTO reports(kind,key,window_start,window_end,content,generated_at) VALUES('daily',${date},${new Date(at(date))},${new Date(at(date))},'{}',${new Date(at(date))})`;
 }
@@ -41,7 +48,7 @@ test("midnight preserves a missing edition; each date recovers only when its rep
 test("recent gap detection uses report activity and each edition's overdue time", async () => {
   await sql`INSERT INTO job_runs(job,started_at,status) VALUES('reports.compose',${new Date(at("2026-10-05"))},'failed')`;
   await report("2026-10-06");
-  const findings = await collectFindings(at("2026-10-07", "09:59"));
+  const findings = await collectFindings(at("2026-10-07", beforeDue));
   assert.deepEqual(daily(findings.map(f => f.key)), [key("2026-10-05")]);
   await report("2026-09-01");
   assert.deepEqual(daily((await collectFindings(at("2026-10-07"))).map(f => f.key)),

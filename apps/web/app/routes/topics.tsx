@@ -1,5 +1,5 @@
 import { useLoaderData } from "react-router";
-import { SITE, subjectAfter, withSubject } from "@aihot/site";
+import { SITE, withSubject } from "@aihot/site";
 import type { Route } from "./+types/topics";
 import type { TopicSummary, TopicsResponse } from "@aihot/contracts/site";
 import { apiGet, cachedPage } from "../lib/api.server";
@@ -12,7 +12,7 @@ import { BrandMark } from "../components/BrandMark";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import type { Screen } from "../components/shell/screens";
 
-export const handle: Screen = { home: "me", name: "主题" };
+export const handle: Screen = { home: "me", name: "Topics" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -23,13 +23,13 @@ export async function loader({ request }: { request: Request }) {
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return pageMeta({ title: SITE.topicsTitle, path: "/topics", image: "/og/pages/topics.png" });
   const { groups, topics } = loaderData;
-  const by = groups.map((g) => g.name).join("、");
+  const by = groups.map((g) => g.name.toLowerCase()).join(", ");
   const indexed = topics.filter((t) => t.indexable);
-  const named = indexed.slice(0, 6).map((t) => t.name.split(" / ")[0]).join("、");
+  const named = indexed.slice(0, 6).map((t) => t.name.split(" / ")[0]).join(", ");
   const base = siteUrl();
   return pageMeta({
     title: SITE.topicsTitle,
-    description: `按${by}${subjectAfter("追踪", "最新动态")}：${named ? `${named}等 ` : ""}${topics.length} 个主题，浏览最新精选与重要进展，持续更新。`,
+    description: `Follow U.S.–China news by ${by}: ${topics.length} topics${named ? ` including ${named}` : ""}, with the latest top stories and key developments.`,
     path: "/topics",
     image: "/og/pages/topics.png",
     jsonLd: [
@@ -38,7 +38,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
         "@type": "CollectionPage",
         "@id": `${base}/topics#collection`,
         url: `${base}/topics`,
-        name: withSubject("主题"),
+        name: withSubject("topics"),
         inLanguage: SITE.locale,
         isPartOf: { "@id": `${base}/#website` },
         mainEntity: {
@@ -47,7 +47,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
           itemListElement: indexed.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.name, url: `${base}/topics/${t.slug}` })),
         },
       },
-      breadcrumbLd([{ name: SITE.name, path: "/" }, { name: "主题", path: "/topics" }]),
+      breadcrumbLd([{ name: SITE.name, path: "/" }, { name: "Topics", path: "/topics" }]),
     ],
   });
 }
@@ -82,10 +82,10 @@ function TopicCard({ t }: { t: TopicSummary }) {
           <span>
             {t.recent > 0 ? (
               <>
-                近 30 天 <span className="num font-semibold text-ink-3">{t.recent}</span> 条
+                <span className="num font-semibold text-ink-3">{t.recent}</span> in 30 days
               </>
             ) : (
-              "近 30 天暂无新精选"
+              "Nothing new in 30 days"
             )}
           </span>
         </span>
@@ -99,12 +99,12 @@ export default function TopicsPage() {
   const { groups, topics } = useLoaderData<typeof loader>();
   return (
     <div className="pb-10">
-      <PhoneBar back={{ to: "/more", label: "我的" }} title="主题" />
+      <PhoneBar back={{ to: "/more", label: "More" }} title="Topics" />
       <header className="pb-2 pt-3 lg:pt-1">
-        <h1 data-page-title="" className="text-[24px] font-semibold leading-[1.3] text-ink">{subjectAfter("按主题看")}</h1>
+        <h1 data-page-title="" className="text-[24px] font-semibold leading-[1.3] text-ink">Browse by topic</h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-          {`按${groups.map((g) => g.name).join("、")}浏览 `}
-          <span className="num">{topics.length}</span> 个主题，追踪最新精选与重要进展。
+          {`Browse ${groups.map((g) => g.name.toLowerCase()).join(", ")}: `}
+          <span className="num">{topics.length}</span> topics with the latest top stories and key developments.
         </p>
       </header>
       {groups.map((g) => (

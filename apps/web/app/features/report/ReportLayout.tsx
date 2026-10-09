@@ -36,14 +36,14 @@ export function ReportLayout({ kind, index, current, today, outline = [], back, 
               center={<KindSwitch kind={kind} phone />}
               actions={
                 outline.length > 0 && (
-                  <BarButton label="本期目录" onClick={() => setOutlineOpen(true)}>
+                  <BarButton label="Contents" onClick={() => setOutlineOpen(true)}>
                     <IconList size={21} />
                   </BarButton>
                 )
               }
             />
             <ReportPhoneNav kind={kind} index={index} current={current} today={today} />
-            {outline.length > 0 && <OutlineSheet title="本期目录" open={outlineOpen} onClose={() => setOutlineOpen(false)} outline={outline} />}
+            {outline.length > 0 && <OutlineSheet title="Contents" open={outlineOpen} onClose={() => setOutlineOpen(false)} outline={outline} />}
           </>
         )}
         <div className="w-full lg:max-w-[1160px]">{children}</div>

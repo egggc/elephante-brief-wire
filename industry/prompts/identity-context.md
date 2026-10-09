@@ -1,2 +1,2 @@
-【已核验身份上下文】{{facts}}
-这些事实只用于防止公司／模型身份被张冠李戴，不代表发布者必然是文章唯一主题；标题和摘要仍只能使用原始标题、正文或来源事实明确支持的主体。
+[Verified identity context] {{facts}}
+These facts only serve to keep companies and models from being misattributed; the publisher is not necessarily the article's only subject. Headlines and summaries may still only name actors the original title, body or source facts clearly support.

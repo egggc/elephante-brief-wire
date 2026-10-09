@@ -128,12 +128,24 @@ const FactSchema = z
   .nullable()
   .catch(null);
 
+/**
+ * A checkable claim or forecast in the material (who said what will happen, by when), kept in the claims ledger
+ * to be scored 30 and 90 days later. Claims without a speaker or a statement are dropped.
+ */
+const ClaimSchema = z.object({
+  speaker: z.string().trim().min(1).max(160),
+  claim: z.string().trim().min(1).max(400),
+  by: z.string().trim().max(80).nullable().catch(null),
+  quote: z.string().trim().max(600).nullable().catch(null),
+}).nullable().catch(null);
+
 export const StructureSchema = z.object({
   scope: z.enum(["single", "composite", "unknown"]).catch("unknown"),
   category: z.enum(CATEGORY_KEYS).nullable().catch(null),
   tags: z.array(z.string()).max(12).catch([]),
   subjects: z.array(z.string()).max(6).catch([]),
   fact: FactSchema,
+  claims: z.array(ClaimSchema).max(8).catch([]),
 });
 
 const UnderstandSchema = z.object({
@@ -141,23 +153,28 @@ const UnderstandSchema = z.object({
   authorRole: z.enum(["principal", "observer", "relayer"]).catch("relayer"),
   // The understanding prompt asks for tags; the public ones come from the structure step.
   tags: z.array(z.string()).max(12).catch([]),
-  editorialJudgment: z.string().max(400).catch(""),
+  editorialJudgment: z.string().max(600).catch(""),
+  // English first, then Chinese (simplified); a model that leaves out the English still yields the Chinese.
+  titleEn: z.string().trim().max(300).catch(""),
+  summaryEn: z.string().trim().max(4000).catch(""),
   titleZh: z.string().trim().min(1).max(200),
   summaryZh: z.string().trim().min(1).max(4000),
 });
 
-const SummarizeSchema = z.object({ titleZh: z.string(), summaryZh: z.string(), bodyZh: z.string() });
+const SummarizeSchema = z.object({
+  titleEn: z.string(), summaryEn: z.string(), bodyEn: z.string(), titleZh: z.string(), summaryZh: z.string(), bodyZh: z.string(),
+});
 
-const ZH_COUNT = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
+const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 
 /** The structure step owns the public category and tags, as well as grouping evidence (filled from the pack's vocabulary). */
 export const STRUCTURE_SYSTEM = promptText("structure", {
-  categoryCount: ZH_COUNT[CATEGORIES.length] ?? String(CATEGORIES.length),
+  categoryCount: COUNT[CATEGORIES.length] ?? String(CATEGORIES.length),
   categoryGuide: CATEGORY_GUIDE,
-  categoryTags: CATEGORY_TAGS.join("、"),
-  topicTags: TOPIC_TAGS.join("、"),
-  entityTags: ENTITY_TAGS.join("、"),
-  entities: Object.entries(ENTITIES).map(([id, e]) => `${id}（${e.aliases.slice(0, 3).join("/")}）`).join("，"),
+  categoryTags: CATEGORY_TAGS.join(", "),
+  topicTags: TOPIC_TAGS.join(", "),
+  entityTags: ENTITY_TAGS.join(", "),
+  entities: Object.entries(ENTITIES).map(([id, e]) => `${id} (${e.aliases.slice(0, 3).join("/")})`).join(", "),
 });
 
 /** Keep only quotes present both in the original material and in the text the structure model saw. */
@@ -181,10 +198,13 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
       return quote ? [{ text: c.text ?? quote, quote }] : [];
     }).slice(0, 4),
   };
+  const claims = data.claims.flatMap((c) => (c ? [{ speaker: c.speaker, claim: c.claim, by: c.by ?? null, quote: grounded(c.quote) }] : [])).slice(0, 5);
+  // Material with a claim on record carries the "claim" tag, whatever room the other tags left.
+  const tags = normalizeTags(data.tags);
   return {
-    category: data.category, tags: normalizeTags(data.tags),
+    category: data.category, tags: claims.length && !tags.includes("claim") ? [...tags.slice(0, 5), "claim"] : tags,
     subjects: [...new Set(data.subjects.map((s) => s.trim().toLowerCase()).filter((s) => s in ENTITIES))],
-    scope, fact,
+    scope, fact, claims,
   };
 }
 
@@ -328,7 +348,7 @@ export async function runStructure(a: AnalyzeInputArticle, opts: StepOpts = {}):
     user: buildMaterial(a),
     schema: StructureSchema,
     temperature: 0.2,
-    maxTokens: 1200,
+    maxTokens: 2000,
     attemptTag: tagged(opts.attemptTag, "structure"),
   });
   return { ...normalizeStructure(res.data, a), model: res.model, receiptId: res.receiptId, reused: res.reused };
@@ -363,7 +383,7 @@ export async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts = {})
     }
   }
   const d = res.data;
-  const copy = finalizeCopy(translateInputOf(a), { titleZh: d.titleZh, summaryZh: d.summaryZh });
+  const copy = finalizeCopy(translateInputOf(a), { titleEn: d.titleEn, summaryEn: d.summaryEn, titleZh: d.titleZh, summaryZh: d.summaryZh });
   return {
     kind: "understand", model: res.model, titleZh: copy.titleZh, summaryZh: copy.summaryZh, reasonZh: d.editorialJudgment.trim() || null,
     itemType: d.itemType, authorRole: d.authorRole, identityGuard: copy.identityGuard, receiptIds: [res.receiptId], reused: res.reused,
@@ -379,7 +399,7 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
   const plain = { reasonZh: null, receiptIds: [] as number[], reused: true };
   // A short post already in Chinese is its own copy, and too little text is not written up from a title.
   if (short && !needsShortTweetTranslation(main)) return { kind: "verbatim", model: null, titleZh: main, summaryZh: main, ...plain };
-  if (!short && t.text.trim().length < 20) return { kind: "none", model: null, titleZh: looksZh(t.title) ? t.title : "", summaryZh: "", ...plain };
+  if (!short && t.text.trim().length < 20) return { kind: "none", model: null, titleZh: collapseWhitespace(t.title), summaryZh: "", ...plain };
   const model = await modelFor("summarize");
   checkAnalysisRunning();
   const res = await chatJson({
@@ -393,15 +413,15 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
     json: false,
     parse: parseTranslateOutput,
     temperature: 0.2,
-    maxTokens: 2048,
+    maxTokens: 3072,
     attemptTag: tagged(opts.attemptTag, "summarize"),
   });
   const p = res.data;
   const draft = short
-    ? { titleZh: p.titleZh || (looksZh(main) ? main : ""), summaryZh: p.bodyZh || p.summaryZh }
+    ? { titleEn: p.titleEn, summaryEn: p.bodyEn || p.summaryEn, titleZh: p.titleZh || (looksZh(main) ? main : ""), summaryZh: p.bodyZh || p.summaryZh }
     : isX
-      ? { titleZh: p.titleZh, summaryZh: p.summaryZh || p.bodyZh }
-      : { titleZh: p.titleZh || (looksZh(t.title) ? t.title : ""), summaryZh: p.summaryZh };
+      ? { titleEn: p.titleEn, summaryEn: p.summaryEn || p.bodyEn, titleZh: p.titleZh, summaryZh: p.summaryZh || p.bodyZh }
+      : { titleEn: p.titleEn || (looksZh(t.title) ? "" : t.title), summaryEn: p.summaryEn, titleZh: p.titleZh || (looksZh(t.title) ? t.title : ""), summaryZh: p.summaryZh };
   const copy = finalizeCopy(t, draft);
   return { kind: "summarize", model: res.model, titleZh: copy.titleZh, summaryZh: copy.summaryZh, reasonZh: null, identityGuard: copy.identityGuard, receiptIds: [res.receiptId], reused: res.reused };
 }
@@ -469,6 +489,7 @@ export function normalizeAnalysis(run: AnalysisRun) {
     reasonZh: run.writing?.reasonZh ?? null,
     scope: run.structure?.scope ?? "unknown",
     fact: run.structure?.fact ?? null,
+    claims: run.structure?.claims ?? [],
   };
 }
 
@@ -502,7 +523,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     scores: out.scores, scoreModel: out.scoreModel, threshold: out.threshold, ...(out.scoreRefused ? { scoreRefused: true } : {}),
     ...(w ? { writer: w.kind, writerModel: w.model, itemType: w.itemType ?? null, authorRole: w.authorRole ?? null } : {}),
     ...(w?.identityGuard?.outcome === "fallback" ? { identityGuard: w.identityGuard } : {}),
-    scope: out.scope, fact: out.fact,
+    scope: out.scope, fact: out.fact, ...(out.claims.length ? { claims: out.claims } : {}),
   };
   const committed = await sql.begin(async (tx) => {
     const [current] = await tx<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${articleId} FOR UPDATE`;

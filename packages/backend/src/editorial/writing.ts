@@ -125,7 +125,7 @@ export function missingEvidence(a: AnalyzeInputArticle): boolean {
 }
 
 export const understandUser = (a: AnalyzeInputArticle) =>
-  ["请按系统规则理解以下单篇材料，一次返回全部六个字段。", renderContext(a, { annotateQuoted: true })].join("\n\n");
+  ["请按系统规则理解以下单篇材料，一次返回全部字段。", renderContext(a, { annotateQuoted: true })].join("\n\n");
 
 // Identity context and guard
 
@@ -199,9 +199,9 @@ function identityContext(input: TranslateInput) {
 function identityPrompt(input: TranslateInput): string {
   const ctx = identityContext(input);
   const facts: string[] = [];
-  if (ctx.publisher) facts.push(`文档发布域主体=${lexiconName(ctx.publisher) ?? ctx.publisher}`);
-  if (ctx.owner) facts.push(`来源账号主体=${lexiconName(ctx.owner) ?? ctx.owner}`);
-  return promptText("identity-context", { facts: facts.length > 0 ? facts.join("；") : "未识别到明确发布主体" });
+  if (ctx.publisher) facts.push(`publisher of the document's domain = ${lexiconName(ctx.publisher) ?? ctx.publisher}`);
+  if (ctx.owner) facts.push(`owner of the source account = ${lexiconName(ctx.owner) ?? ctx.owner}`);
+  return promptText("identity-context", { facts: facts.length > 0 ? facts.join("; ") : "no clear publisher identified" });
 }
 
 export interface IdentityGuard {
@@ -212,14 +212,14 @@ export interface IdentityGuard {
 
 /**
  * A model only words the copy; it cannot introduce a company the input does not name. A title that
- * does falls back to the original Chinese title (or nothing), a summary that does is dropped.
+ * does falls back to the original title, a summary that does is dropped.
  */
 export function enforceIdentity(input: TranslateInput, copy: { titleZh: string; summaryZh: string }) {
   const allowed = new Set(identityContext(input).allowed);
   const unsupportedTitleEntityIds = matchEntityIds([copy.titleZh]).filter((id) => !allowed.has(id));
   const unsupportedSummaryEntityIds = matchEntityIds([copy.summaryZh]).filter((id) => !allowed.has(id));
   return {
-    titleZh: unsupportedTitleEntityIds.length ? (looksZh(input.title) ? input.title : "") : copy.titleZh,
+    titleZh: unsupportedTitleEntityIds.length ? collapseSpaces(input.title) : copy.titleZh,
     summaryZh: unsupportedSummaryEntityIds.length ? "" : copy.summaryZh,
     identityGuard: {
       outcome: unsupportedTitleEntityIds.length || unsupportedSummaryEntityIds.length ? "fallback" : "pass",
@@ -228,6 +228,8 @@ export function enforceIdentity(input: TranslateInput, copy: { titleZh: string; 
     } as IdentityGuard,
   };
 }
+
+const collapseSpaces = (s: string) => s.replace(/\s+/g, " ").trim();
 
 // Answer-first summary length
 
@@ -253,6 +255,20 @@ export function compactAnswerFirstSummary(summary: string, maxChars = 190): stri
   return result.length >= 50 ? `${result.replace(/[，；：、,;:]$/u, "")}。` : text;
 }
 
+/** An English summary past `maxChars` keeps its leading whole sentences (at least the first). */
+export function compactEnglishSummary(summary: string, maxChars = 520): string {
+  const text = summary.trim().replace(/\s*\n+\s*/g, " ");
+  if (text.length <= maxChars) return text;
+  // A sentence ends at . ! or ? followed by a space and a capital (so "U.S. tariffs" stays whole).
+  const sentences = text.split(/(?<=[.!?]["”’)]?)\s+(?=["“(]?[A-Z0-9])/);
+  let result = "";
+  for (const sentence of sentences) {
+    if (result && result.length + 1 + sentence.length > maxChars) break;
+    result = result ? `${result} ${sentence}` : sentence;
+  }
+  return result;
+}
+
 function answerFirstSummaryLengthOk(summary: string, input: TranslateInput): boolean {
   const trimmed = summary.trim();
   const sourceLength = (input.sourceKind === "x_search" ? input.text : cleanArticleTextForLLM(input.text)).trim().length;
@@ -263,19 +279,43 @@ function answerFirstSummaryLengthOk(summary: string, input: TranslateInput): boo
 
 export const isShortTweetInput = (input: TranslateInput) => input.sourceKind === "x_search" && isShortTweet(input.mainText || input.title);
 
-/** The length rule (compacted without another call) and the identity guard, for any writing model. */
-export function finalizeCopy(input: TranslateInput, copy: { titleZh: string; summaryZh: string }) {
-  let summaryZh = copy.summaryZh;
-  if (!isShortTweetInput(input) && summaryZh && !answerFirstSummaryLengthOk(summaryZh, input)) summaryZh = compactAnswerFirstSummary(summaryZh);
-  return enforceIdentity(input, { titleZh: copy.titleZh, summaryZh });
+/** A writer's draft: the English headline and summary, then the Chinese ones. Either language may be missing. */
+export interface BilingualDraft {
+  titleEn?: string;
+  summaryEn?: string;
+  titleZh: string;
+  summaryZh: string;
+}
+
+/**
+ * The reader-facing copy from a bilingual draft: the English headline is the title; the summary is the English
+ * summary, a blank line, then the Chinese headline and summary on their own lines. A draft in one language only
+ * stands as it is. (The stored fields keep their historical names, title_zh and summary_zh.)
+ */
+export function bilingualCopy(draft: BilingualDraft): { titleZh: string; summaryZh: string } {
+  const titleEn = collapseSpaces(draft.titleEn ?? "");
+  const titleZh = collapseSpaces(draft.titleZh);
+  const chinese = [titleEn ? titleZh : "", draft.summaryZh.trim()].filter(Boolean).join("\n");
+  return { titleZh: titleEn || titleZh, summaryZh: [(draft.summaryEn ?? "").trim(), chinese].filter(Boolean).join("\n\n") };
+}
+
+/** The length rules (compacted without another call), the bilingual layout and the identity guard, for any writing model. */
+export function finalizeCopy(input: TranslateInput, draft: BilingualDraft) {
+  let summaryZh = draft.summaryZh;
+  let summaryEn = draft.summaryEn ?? "";
+  if (!isShortTweetInput(input)) {
+    if (summaryZh && !answerFirstSummaryLengthOk(summaryZh, input)) summaryZh = compactAnswerFirstSummary(summaryZh);
+    if (summaryEn) summaryEn = compactEnglishSummary(summaryEn);
+  }
+  return enforceIdentity(input, bilingualCopy({ ...draft, summaryEn, summaryZh }));
 }
 
 // Title/summary prompts for items the content understanding does not write
 
-const sourceName = (name?: string) => name?.trim() || "（未注明）";
+const sourceName = (name?: string) => name?.trim() || "(not stated)";
 
 function anchorDate(d: Date | undefined): string {
-  if (!d || Number.isNaN(d.getTime())) return "未注明";
+  if (!d || Number.isNaN(d.getTime())) return "not stated";
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
 
@@ -293,7 +333,7 @@ export function buildArticlePrompt(input: TranslateInput): string {
 /** The quoted post's block, appended after a blank line when there is one. */
 function quotedBlock(input: TranslateInput, name: string): string {
   if (!input.quotedText) return "";
-  return `\n\n${promptText(name, { quotedLabel: input.quotedAuthor ? `@${input.quotedAuthor}` : "引用推文", quotedText: clampText(input.quotedText, 1500) })}`;
+  return `\n\n${promptText(name, { quotedLabel: input.quotedAuthor ? `@${input.quotedAuthor}` : "Quoted post", quotedText: clampText(input.quotedText, 1500) })}`;
 }
 
 export function buildShortTweetPrompt(input: TranslateInput): string {
@@ -306,8 +346,8 @@ export function buildLongTweetPrompt(input: TranslateInput): string {
   return promptText("summarize-long-post", { sourceName: sourceName(input.sourceName), identity: identityPrompt(input), post }) + quotedBlock(input, "summarize-long-post-quoted");
 }
 
-/** Prompt lines a model sometimes repeats after its answer (来源：…, 【已核验身份上下文】…, 原始标题：…). */
-const ECHO_LINE = /^(来源[:：]|【已核验身份上下文】|这些事实只用于防止|原始标题[:：]|【时间锚点】)/;
+/** Prompt lines a model sometimes repeats after its answer (Source: …, [Verified identity context] …, Original title: …). */
+const ECHO_LINE = /^(来源[:：]|【已核验身份上下文】|这些事实只用于防止|原始标题[:：]|【时间锚点】|Source:|\[Verified identity context\]|These facts only|Original title:|\[Time anchor\])/;
 
 /** The answer without prompt lines repeated at its end. */
 export function stripEcho(text: string): string {
@@ -316,60 +356,65 @@ export function stripEcho(text: string): string {
   return lines.join("\n").trim();
 }
 
-/** `title_zh:` / `summary_zh:` / `body_zh:` lines, with fallbacks for answers that drop the labels. */
-export function parseTranslateOutput(text: string): { titleZh: string; summaryZh: string; bodyZh: string } {
-  let titleZh = "";
-  let summaryZh = "";
-  let bodyZh = "";
-  let titleLine = -1;
-  let summaryLine = -1;
-  let bodyLine = -1;
+const LABEL = /^(title|summary|body)_(en|zh)\s*[:：]\s*(.*)$/;
+
+export interface TranslateOutput {
+  titleEn: string;
+  summaryEn: string;
+  bodyEn: string;
+  titleZh: string;
+  summaryZh: string;
+  bodyZh: string;
+}
+
+/**
+ * `title_en:` / `summary_en:` / `body_en:` and `title_zh:` / `summary_zh:` / `body_zh:` lines. A title is its
+ * line; a summary or body runs to the next label (a body keeps its paragraph breaks). An answer without labels
+ * reads as a title line and then the summary.
+ */
+export function parseTranslateOutput(text: string): TranslateOutput {
+  const out: TranslateOutput = { titleEn: "", summaryEn: "", bodyEn: "", titleZh: "", summaryZh: "", bodyZh: "" };
+  const field = (kind: string, lang: string) => `${kind}${lang === "en" ? "En" : "Zh"}` as keyof TranslateOutput;
   const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i += 1) {
-    const t = lines[i]!.trim();
-    const title = t.match(/^title_zh\s*[:：]\s*(.*)$/);
-    if (title) { titleZh = title[1]!.trim(); titleLine = i; continue; }
-    const summary = t.match(/^summary_zh\s*[:：]\s*(.*)$/);
-    if (summary) { summaryZh = summary[1]!.trim(); summaryLine = i; continue; }
-    const body = t.match(/^body_zh\s*[:：]\s*(.*)$/);
-    if (body) { bodyZh = body[1]!.trim(); bodyLine = i; continue; }
-  }
-  // A title without a labelled summary or body: the lines after it are the summary.
-  if (titleZh && !summaryZh && bodyLine < 0 && titleLine >= 0) {
-    const rest = lines.slice(titleLine + 1).map((l) => l.trim()).filter(Boolean);
-    if (rest.length) summaryZh = rest.join("\n");
-  }
-  // A summary split over lines: join the unlabelled lines after it.
-  if (summaryLine >= 0) {
-    const more: string[] = [];
-    for (let i = summaryLine + 1; i < lines.length; i += 1) {
-      const t = lines[i]!.trim();
-      if (!t) continue;
-      if (/^(title_zh|summary_zh|body_zh)\s*[:：]/.test(t)) break;
-      more.push(t);
+  let current: keyof TranslateOutput | null = null;
+  let afterTitle: keyof TranslateOutput | null = null;
+  const extra = new Map<keyof TranslateOutput, string[]>();
+  for (const line of lines) {
+    const label = line.trim().match(LABEL);
+    if (label) {
+      const key = field(label[1]!, label[2]!);
+      out[key] = label[3]!.trim();
+      // Lines after a title belong to nothing, unless no summary or body comes: then they are the summary.
+      current = label[1] === "title" ? null : key;
+      afterTitle = label[1] === "title" ? field("summary", label[2]!) : null;
+      continue;
     }
-    const parts = [summaryZh, ...more].filter(Boolean);
-    if (parts.length) summaryZh = parts.join("\n");
+    if (current) extra.set(current, [...(extra.get(current) ?? []), line]);
+    else if (afterTitle) extra.set(`~${afterTitle}` as keyof TranslateOutput, [...(extra.get(`~${afterTitle}` as keyof TranslateOutput) ?? []), line]);
   }
-  // A body over lines keeps its paragraph breaks.
-  if (bodyLine >= 0) {
-    const more: string[] = [];
-    for (let i = bodyLine + 1; i < lines.length; i += 1) {
-      if (/^(title_zh|summary_zh|body_zh)\s*[:：]/.test(lines[i]!.trim())) break;
-      more.push(lines[i]!);
+  for (const [key, more] of extra) {
+    if (key.startsWith("~")) continue;
+    if (key.startsWith("body")) {
+      while (more.length && more[more.length - 1]!.trim() === "") more.pop();
+      const parts = out[key] ? [out[key], ...more] : more;
+      out[key] = parts.join("\n");
+    } else {
+      out[key] = [out[key], ...more.map((l) => l.trim())].filter(Boolean).join("\n");
     }
-    while (more.length && more[more.length - 1]!.trim() === "") more.pop();
-    const parts = bodyZh ? [bodyZh, ...more] : more;
-    if (parts.length) bodyZh = parts.join("\n");
   }
-  if (!titleZh && !summaryZh && !bodyZh) {
+  // A title with no labelled summary or body in its language: the unlabelled lines after it are the summary.
+  for (const lang of ["en", "zh"] as const) {
+    const summary = field("summary", lang);
+    const loose = extra.get(`~${summary}` as keyof TranslateOutput);
+    if (out[field("title", lang)] && !out[summary] && !out[field("body", lang)] && loose) out[summary] = loose.map((l) => l.trim()).filter(Boolean).join("\n");
+  }
+  if (Object.values(out).every((v) => !v)) {
     const rest = text.trim().split(/\r?\n/).filter(Boolean);
-    if (rest.length >= 2) {
-      titleZh = rest[0]!.trim();
-      summaryZh = rest.slice(1).join("\n").trim();
-    } else if (rest.length === 1) {
-      titleZh = rest[0]!.trim();
+    if (rest.length) {
+      out.titleZh = rest[0]!.trim();
+      out.summaryZh = rest.slice(1).join("\n").trim();
     }
   }
-  return { titleZh, summaryZh: stripEcho(summaryZh), bodyZh: stripEcho(bodyZh) };
+  for (const key of ["summaryEn", "bodyEn", "summaryZh", "bodyZh"] as const) out[key] = stripEcho(out[key]);
+  return out;
 }

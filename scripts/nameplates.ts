@@ -27,23 +27,24 @@ function gap(a: string, b: string): number {
   return H * 0.085;
 }
 
-const S = SITE.subject;
+// The last word of the site name ("BRIEF"), in the accent, then the edition.
+const S = SITE.name.split(/\s+/).at(-1)!.toUpperCase();
 const NAMEPLATES: Record<string, Array<{ text: string; accent: boolean }>> = {
   daily: [
     { text: S, accent: true },
-    { text: "日报", accent: false },
+    { text: "DAILY", accent: false },
   ],
   weekly: [
     { text: S, accent: true },
-    { text: "周报", accent: false },
+    { text: "WEEKLY", accent: false },
   ],
   monthly: [
     { text: S, accent: true },
-    { text: "月报", accent: false },
+    { text: "MONTHLY", accent: false },
   ],
   archive: [
-    { text: "日报", accent: false },
-    { text: "合订本", accent: true },
+    { text: "DAILY", accent: false },
+    { text: "ARCHIVE", accent: true },
   ],
 };
 
@@ -75,7 +76,8 @@ function fit(group: string[], height: number) {
   const size = (1000 * height) / (bottom - top);
   return { size, baseline: -((top + bottom) / 2) * (size / 1000) };
 }
-const cjk = fit(chars.filter((ch) => !isLatin(ch)), H);
+const cjkChars = chars.filter((ch) => !isLatin(ch));
+const cjk = cjkChars.length ? fit(cjkChars, H) : fit(chars, CAPS);
 const latin = chars.some(isLatin) ? fit(chars.filter(isLatin), CAPS) : cjk;
 
 const out: Record<string, { viewBox: string; accent: string; ink: string }> = {};
@@ -84,7 +86,9 @@ for (const [name, parts] of Object.entries(NAMEPLATES)) {
   const ink: string[] = [];
   let x = MARGIN;
   let prev: string | null = null;
-  for (const part of parts) {
+  for (const [index, part] of parts.entries()) {
+    // Two Latin words need a word space between them, not the letter spacing.
+    if (index > 0 && prev && isLatin(prev) && isLatin(part.text[0]!)) x += H * 0.22;
     for (const ch of part.text) {
       const { size, baseline } = isLatin(ch) ? latin : cjk;
       const box = boxes.get(ch)!;

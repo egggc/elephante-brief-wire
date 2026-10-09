@@ -29,8 +29,8 @@ export async function releaseReceipt(id: number, input: { billed: boolean; note:
   if (!input.note?.trim()) throw new Error("note is required");
   const [row] = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE id = ${id}`;
   if (!row) return null;
-  if (row.status !== "unknown") throw new Conflict("只有结果未知的回执需要人工核对");
-  const error = `人工核对：${input.billed ? "供应商已计费但结果未取回" : "供应商未计费"}。${input.note}`;
+  if (row.status !== "unknown") throw new Conflict("Only receipts with an unknown outcome need a manual check");
+  const error = `Manual check: ${input.billed ? "the provider billed it but the result was not received" : "the provider did not bill it"}. ${input.note}`;
   return release(id, error, actor, input.note, input.billed);
 }
 

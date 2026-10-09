@@ -75,7 +75,7 @@ function BackButton({ to, label }: BackTarget) {
   useIsoLayoutEffect(() => {
     if (historyIndex() === 0) return setText(label);
     const behind = previousScreen();
-    setText(behind ? behind : "返回");
+    setText(behind ? behind : "Back");
   }, [key, label]);
   return (
     <button

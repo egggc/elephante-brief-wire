@@ -1,19 +1,24 @@
-// 精选的门槛。评分标准本身写在 prompts/selection-score.md；这里只决定“多少分算入选”。
-// 每篇资料由评分模型独立打两次分（0–100），两次之和 ≥ 2 × 门槛、并确认不是精选里已有新闻的重复报道才进精选
-// （见 docs/selection.md），卡片上显示两次的平均分。
-// 门槛按信源分级区分：官方一手信源的门槛低一些，媒体和个人的高一些。改了门槛或评分提示词，
-// 用 scripts/eval-selection.ts 在你自己标注的样本上重跑一遍，再决定上线（见 docs/selection.md）。
+// Selection thresholds. The scoring standard itself is in prompts/selection-score.md; this only decides how many
+// points make the cut. Each item is scored twice, independently (0–100); when the two add up to at least
+// 2 × the threshold and grouping confirms it is not a repeat of a story already selected, it is selected
+// (docs/selection.md). Cards show the mean of the two scores.
+//
+// Elephante Brief's rubric has four axes worth 10 points together (stakes at the seam 0–3, the speaker's cost of
+// being wrong 0–3, seam asymmetry 0–2, quiet signal 0–2), times 10; an item with no stakes at the seam is capped at
+// 20. So a threshold of 60 means "6 of 10": real stakes plus well-sourced, or real stakes plus a signal the other
+// side is missing. These are starting values, not calibrated ones: label 100–200 items from these sources,
+// run scripts/eval-selection.ts and move them by what it shows (docs/selection.md).
 
 export const SELECTION = {
   /**
-   * 信源分级 → 入选门槛（平均分）。分级在后台“信源”里给每个源设置：
-   *   T1 官方一手（官网、官方博客、机构）· T1_5 官方账号、准官方创作者 · T2 媒体与个人
-   * 分级 EXCLUDE_MP 以及这里没有列出的分级，不参与精选评分（只进“全部动态”）。
+   * Source tier → threshold (mean score). Set each source's tier in the admin under Sources:
+   *   T1 first-party (the government body or company itself) · T1_5 official and semi-official media · T2 media and individuals
+   * EXCLUDE_MP and tiers not listed here are not scored for selection (they appear only in "All").
    */
-  thresholds: { T1: 60, T1_5: 65, T2: 76 } as Record<string, number>,
+  thresholds: { T1: 50, T1_5: 50, T2: 60 } as Record<string, number>,
   /**
-   * 没入选、但平均分高于这个数的资料，也用精选的写法（内容理解：标题、摘要、推荐理由）来写，
-   * 其余用更便宜的“标题摘要翻译”。
+   * Unselected items with a mean score above this are written up like selected ones (content understanding: both
+   * headlines, both summaries, the "why it matters" line); the rest get the cheaper headline-and-summary prompt.
    */
-  understandFloor: 50,
+  understandFloor: 40,
 } as const;
