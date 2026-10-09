@@ -44,13 +44,13 @@ if [ "$MODE" = "nginx" ]; then
   say "What nginx serves now (sites-enabled)"
   for f in /etc/nginx/sites-enabled/*; do
     [ -e "$f" ] || continue
-    names="$(grep -hoE '^\s*server_name\s+[^;]+' "$f" | sed -E 's/^\s*server_name\s+//' | sort -u | paste -sd ' ' -)"
-    listens="$(grep -hoE '^\s*listen\s+[^;]+' "$f" | sed -E 's/^\s*listen\s+//' | sort -u | paste -sd ',' -)"
-    target="$(grep -hoE '\b(proxy_pass|root|return)\s+[^;]+' "$f" | sort -u | head -3 | paste -sd ',' -)"
+    names="$(grep -hoE '^\s*server_name\s+[^;]+' "$f" | sed -E 's/^\s*server_name\s+//' | sort -u | paste -sd ' ' -)" || true
+    listens="$(grep -hoE '^\s*listen\s+[^;]+' "$f" | sed -E 's/^\s*listen\s+//' | sort -u | paste -sd ',' -)" || true
+    target="$(grep -hoE '\b(proxy_pass|root|return)\s+[^;]+' "$f" | sort -u | head -3 | paste -sd ',' -)" || true
     printf '%-40s server_name: %-40s listen: %-20s -> %s\n' "$(basename "$f")" "${names:-?}" "${listens:-?}" "${target:-?}"
   done
   # Another config already claiming the name would make nginx pick one at random.
-  other="$(grep -lE "server_name[^;]*\b$DOMAIN\b" /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf 2>/dev/null | while read -r f; do [ "$(readlink -f "$f")" = "$(readlink -f "$NGINX_SITE")" ] || echo "$f"; done)"
+  other="$(grep -lE "server_name[^;]*\b$DOMAIN\b" /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf 2>/dev/null | while read -r f; do [ "$(readlink -f "$f")" = "$(readlink -f "$NGINX_SITE")" ] || echo "$f"; done)" || true
   [ -z "$other" ] || die "$DOMAIN is already named in: $other. Remove or rename it there first; nothing was changed."
 else
   say "Checking that ports 80 and 443 are free"
