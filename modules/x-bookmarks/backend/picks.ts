@@ -12,9 +12,9 @@ export const SOURCE_ID = "x-editor-picks";
 export const SOURCE_NAME = "X — Editor's picks";
 export const TAG = "editor-pick";
 const REASON = "Editor's pick (X bookmark)";
-/** Bookmarks read per page; a page with nothing new ends the run. */
-const PAGE_SIZE = 20;
-const MAX_PAGES = 5;
+/** Bookmarks read per page (each run reads the newest page even when nothing is new, and X bills by posts read); a page with anything already seen ends the run. */
+const PAGE_SIZE = 10;
+const MAX_PAGES = 10;
 
 /** The source, created as a first-party editorial one so its items are judged and shown. */
 async function ensureSource(): Promise<void> {
