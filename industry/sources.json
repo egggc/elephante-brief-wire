@@ -14,7 +14,7 @@
       "tier": "T1_5",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 120,
+      "interval_minutes": 15,
       "tags": [
         "Official media",
         "Chinese"
@@ -35,7 +35,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -56,7 +56,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -69,7 +69,7 @@
       "name": "Reuters (via Google News)",
       "kind": "rss",
       "config": {
-        "feedUrl": "https://news.google.com/rss/search?q=when:24h+allinurl:reuters.com&ceid=US:en&hl=en-US&gl=US",
+        "feedUrl": "https://news.google.com/rss/search?q=site:reuters.com+when:1d&hl=en-US&gl=US&ceid=US:en",
         "_aihot": {
           "initialBackfillLimit": 8
         }
@@ -77,7 +77,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -98,7 +98,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 120,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -120,7 +120,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 360,
+      "interval_minutes": 60,
       "tags": [
         "Newsletter",
         "English",
@@ -142,7 +142,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -164,7 +164,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -185,7 +185,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -207,7 +207,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -229,7 +229,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",
@@ -251,7 +251,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",
@@ -273,7 +273,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 180,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",
@@ -295,7 +295,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",
@@ -317,7 +317,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",
@@ -339,7 +339,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 120,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -361,7 +361,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 180,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English",
@@ -391,7 +391,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -420,7 +420,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "English"
@@ -448,7 +448,7 @@
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
+      "interval_minutes": 15,
       "tags": [
         "Media",
         "Chinese",

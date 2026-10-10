@@ -3,11 +3,13 @@
 // 2 × the threshold and grouping confirms it is not a repeat of a story already selected, it is selected
 // (docs/selection.md). Cards show the mean of the two scores.
 //
-// Elephante Brief's rubric has four axes worth 10 points together (stakes at the seam 0–3, the speaker's cost of
-// being wrong 0–3, seam asymmetry 0–2, quiet signal 0–2), times 10; an item with no stakes at the seam is capped at
-// 20. So a threshold of 60 means "6 of 10": real stakes plus well-sourced, or real stakes plus a signal the other
-// side is missing. These are starting values, not calibrated ones: label 100–200 items from these sources,
-// run scripts/eval-selection.ts and move them by what it shows (docs/selection.md).
+// Elephante Brief's rubric has four axes worth 10 points together, times 10: stakes 0–3 (the higher of the
+// cross-border stakes and the item's significance as U.S. or Chinese business, markets, policy or tech news, so a
+// Fed decision or a big tech launch scores 3 with no China angle), the speaker's cost of being wrong 0–3, and two
+// bonuses, seam asymmetry 0–2 and quiet signal 0–2. Only an item that is neither cross-border nor major business,
+// markets, policy or tech news (stakes 0) is capped at 20. So a threshold of 60 means "6 of 10": real stakes plus
+// well-sourced, or real stakes plus a bonus. These are starting values, not calibrated ones: label 100–200 items
+// from these sources, run scripts/eval-selection.ts and move them by what it shows (docs/selection.md).
 
 export const SELECTION = {
   /**

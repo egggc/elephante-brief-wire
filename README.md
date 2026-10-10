@@ -15,12 +15,12 @@ Every item is scored twice, independently, on four axes (`industry/prompts/selec
 
 | Axis | Points | What it asks |
 |---|---|---|
-| Stakes at the seam | 0–3 | Trade, capital, tech, policy, people or culture *between* the two countries. Purely domestic news scores 0 unless it shifts the other side's calculus. |
+| Stakes | 0–3 | The higher of two readings: cross-border stakes in trade, capital, tech, policy, people or culture *between* the two countries; or significance as U.S./Chinese business, markets, policy or tech news, with no China angle needed (3 = the day's top story such as a Fed decision, big tech earnings, launches or deals, major AI or regulation news; 2 = significant sector news; 1 = minor). |
 | Speaker's cost of being wrong | 0–3 | Primary documents, regulations, filings, named on-record officials and money committed score high; anonymous sourcing, punditry and PR low. For culture: real sales, box office, bookings, search spikes. |
 | Seam asymmetry | 0–2 | Big in one language, thin or framed differently in the other (tagged `one-side-only`). |
 | Quiet signal | 0–2 | Low heat, high stakes: draft rules, procurement, licensing, personnel and hiring shifts (tagged `quiet-signal`). |
 
-The score is 10 × the sum (0–100), capped at 20 when there are no stakes at the seam. An item is selected when the two
+The score is 10 × the sum (0–100), capped at 20 only for items that are neither cross-border nor major business, markets, policy or tech news. Asymmetry and quiet signal are bonuses. An item is selected when the two
 scores average at least its source tier's threshold (`industry/selection.ts`) and grouping confirms it is not a repeat.
 Cultural signals are tagged `culture`.
 
