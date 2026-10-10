@@ -32,6 +32,18 @@ node --env-file=.env scripts/claims-due.ts            # due today, ±3 days
 node --env-file=.env scripts/claims-due.ts --days 90 --window 7 --json
 ```
 
+**Editor's picks from X bookmarks** (`modules/x-bookmarks`). Every 15 minutes the worker reads the editor's new
+X bookmarks (X API v2, OAuth 2.0 user login) and takes each in as source “X — Editor's picks” (T1). A post that links
+an article brings in the article, with the post as context; any other post comes in as itself. Picks are always
+selected, tagged `editor-pick` (topic “Editor's Picks”). Reads are billed and count against the `x_api` budget
+(200 a day by default; adjust it in the admin). Set `X_CLIENT_ID`, `X_CLIENT_SECRET` and `X_REDIRECT_URI` in `.env`,
+then log in once:
+
+```bash
+docker compose run --rm worker node scripts/x-auth.ts
+node --env-file=.env modules/x-bookmarks/scripts/gold.ts   # add the picks to .data/gold.jsonl as "select" labels
+```
+
 ## Where things live
 
 | Path | What |

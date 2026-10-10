@@ -33,6 +33,8 @@ export interface AnalyzeInputArticle {
   };
   /** Stored Chinese translation of the body (e.g. a full post whose original was truncated). */
   translationZh?: string | null;
+  /** An editor selected it (editorial_overrides fields.selected): the prefilter cannot block it. */
+  editorSelected?: boolean;
 }
 
 /**
@@ -50,11 +52,12 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
     id: string; revision: number; title: string; url: string; author: string | null; published_at: Date | null; discovered_at: Date;
     body_text: string | null; excerpt: string | null; body_status: string; x_post: Record<string, any> | null; x_article: { title?: string; text?: string } | null;
     media: Array<Record<string, any>>; source_name: string; source_kind: string; tier: string; first_party: boolean; source_tags: string[]; owner_entity_id: string | null;
-    config: Record<string, any>; translation_zh: string | null;
+    config: Record<string, any>; translation_zh: string | null; editor_selected: boolean;
   }[]>`
     SELECT a.id, a.revision, a.title, a.url, a.author, a.published_at, a.discovered_at, a.body_text, a.excerpt, a.body_status, a.x_post, a.x_article, a.media,
            s.name AS source_name, s.kind AS source_kind, s.tier, s.first_party, s.tags AS source_tags, s.owner_entity_id, s.config,
-           tr.body_text AS translation_zh
+           tr.body_text AS translation_zh,
+           EXISTS (SELECT 1 FROM editorial_overrides o WHERE o.article_id = a.id AND o.fields->'selected' = 'true'::jsonb) AS editor_selected
     FROM articles a JOIN sources s ON s.id = a.source_id
     LEFT JOIN translations tr ON tr.article_id = a.id AND tr.lang = 'zh' AND tr.revision >= a.revision
     WHERE a.id = ${articleId}`;
@@ -67,6 +70,7 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
       fetchesBody: row.config?.fetchPublicContent === true || !!row.config?.detail || row.source_kind === "web_list",
     },
     translationZh: row.translation_zh,
+    editorSelected: row.editor_selected,
   };
 }
 

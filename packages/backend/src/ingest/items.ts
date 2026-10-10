@@ -21,10 +21,19 @@ interface ItemIn {
   url?: unknown;
   publishedAt?: unknown;
   author?: unknown;
+  /** The item's own summary (a feed's description). */
+  summary?: unknown;
+  /** Its full text, when the reporter has it; without one, a source that asks for pages fetches the page. */
+  body?: unknown;
   raw?: { _aihot?: { backfill?: boolean; baseline?: boolean } } & Record<string, unknown>;
 }
 
-export async function ingestItems(body: { sourceId?: unknown; sourceName?: unknown; items?: unknown }): Promise<{ ok: true; created: number }> {
+/**
+ * `prepare` (a module reporting in-process) runs for each item's article before it is queued for
+ * processing, so whatever it records about the article is there when the analysis reads it.
+ */
+export async function ingestItems(body: { sourceId?: unknown; sourceName?: unknown; items?: unknown },
+  options: { prepare?: (articleId: string, item: { url: string; created: boolean }) => Promise<void> } = {}): Promise<{ ok: true; created: number }> {
   const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : "";
   const items = Array.isArray(body.items) ? (body.items as ItemIn[]) : [];
   if (!sourceId || !items.length) throw new IngestError(400, "sourceId and items[] required");
@@ -58,11 +67,14 @@ export async function ingestItems(body: { sourceId?: unknown; sourceName?: unkno
       title,
       author: typeof it.author === "string" ? it.author.slice(0, 200) : null,
       publishedAt: published && Number.isFinite(published.getTime()) ? published : null,
+      excerpt: typeof it.summary === "string" && it.summary.trim() ? it.summary.trim().slice(0, 4000) : null,
+      bodyText: typeof it.body === "string" && it.body.trim() ? it.body.trim() : null,
       raw: it.raw ?? null,
       via: "ingest",
       backfill: flags.backfill ? "reported-backfill" : flags.baseline ? "reported-baseline" : null,
     });
     if (res.created) created += 1;
+    await options.prepare?.(res.articleId, { url: rawUrl, created: res.created });
     if (res.created || res.revised || res.processingNeeded) await queueProcessing(res.articleId);
   }
   await sql`UPDATE sources SET last_fetch_at = now(), last_ok_at = now() WHERE id = ${source!.id}`;

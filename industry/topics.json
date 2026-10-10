@@ -365,6 +365,15 @@
       "definition": "Celebrity, film, music, fashion, brands and youth trends that show how each side sees the other."
     },
     {
+      "slug": "editors-picks",
+      "name": "Editor's Picks",
+      "group": "genre",
+      "tags": [
+        "editor-pick"
+      ],
+      "definition": "Stories the editor flagged by hand, whatever their score."
+    },
+    {
       "slug": "claims",
       "name": "Claims on Record",
       "group": "genre",

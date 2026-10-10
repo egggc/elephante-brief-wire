@@ -274,7 +274,11 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const title = pickString(f.title, original?.title ?? zhTitle ?? (readableTitle || article.x_post ? collapseWhitespace(article.title) : null));
   const summary = pickString(f.summary, original ? original.summary : analysis?.summary_zh ?? null);
   const category = pickString(f.category, analysis?.category ?? null);
-  const tags = Array.isArray(f.tags) ? (f.tags as string[]) : [...new Set([...(analysis?.tags ?? []), ...(analysis?.subjects ?? []).map((s) => `entity:${s}`)])];
+  // `addTags` (set by a module, not the admin form) joins the tags whichever way they were decided.
+  const tags = [...new Set([
+    ...(Array.isArray(f.tags) ? (f.tags as string[]) : [...(analysis?.tags ?? []), ...(analysis?.subjects ?? []).map((s) => `entity:${s}`)]),
+    ...(Array.isArray(f.addTags) ? (f.addTags as string[]) : []),
+  ])];
   const score = typeof f.score === "number" ? f.score : analysis?.score ?? null;
   const relevance = typeof f.relevance === "string" ? (f.relevance as string) : analysis?.relevance ?? null;
   const judgedSelected = typeof f.selected === "boolean" ? (f.selected as boolean) : analysis?.selected ?? null;
