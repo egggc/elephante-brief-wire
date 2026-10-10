@@ -1,5 +1,6 @@
-// The editor's X bookmarks become always-selected, tagged items through the ingest path; the refresh token
-// rotates in the database; a bookmark is taken in once; every read is a receipt under the x_api budget.
+// The editor's X bookmarks: a linked article becomes an always-selected, tagged item with nothing of the
+// post but its address; a post without one stays private heat evidence. The refresh token rotates in the
+// database; a bookmark is taken in once; every read is a receipt under the x_api budget.
 import { stub, tag } from "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -7,8 +8,9 @@ import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { normalizeAnalysis, type AnalysisRun } from "@aihot/backend/editorial/analyze";
 import { stopBoss } from "@aihot/backend/jobs/queue";
+import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { publishArticle } from "@aihot/backend/publication/publish";
-import { SOURCE_ID, TAG, syncBookmarks } from "../backend/picks.ts";
+import { PRIVATE_SOURCE_ID, SOURCE_ID, TAG, syncBookmarks } from "../backend/picks.ts";
 import { goldRows } from "../backend/gold.ts";
 import { codeFrom, loginRequest } from "../backend/x.ts";
 
@@ -62,9 +64,9 @@ after(async () => {
 const pickArticle = async (tweetId: string) =>
   (await sql<{ article_id: string }[]>`SELECT article_id FROM x_bookmarks_picks WHERE tweet_id = ${tweetId}`)[0]!.article_id;
 
-test("new bookmarks come in as editor's picks once, with the refresh token rotated and every read under the x_api budget", async () => {
+test("new bookmarks come in once, with the refresh token rotated and every read under the x_api budget", async () => {
   const first = await syncBookmarks();
-  assert.deepEqual(first, { pages: 1, new: 2, taken: 2 });
+  assert.deepEqual(first, { pages: 1, new: 2, articles: 1, posts: 1 });
 
   assert.equal(tokenForms.length, 1);
   assert.equal(tokenForms[0]!.get("grant_type"), "refresh_token");
@@ -80,42 +82,57 @@ test("new bookmarks come in as editor's picks once, with the refresh token rotat
   const receipts = await sql`SELECT 1 FROM receipts WHERE service = 'x_api' AND subject = ${`x-bookmarks:${USER}`}`;
   assert.equal(receipts.length, 1);
 
-  // The linked article comes in as the article, the post as its context; a plain post as itself.
-  const [linked] = await sql<{ url: string; title: string; excerpt: string; body_status: string }[]>`
-    SELECT url, title, excerpt, body_status FROM articles WHERE id = ${await pickArticle(LINKED)}`;
+  // The linked article comes in alone, from the link card and the publisher's page: no post text.
+  const linkedId = await pickArticle(LINKED);
+  const [linked] = await sql<{ source_id: string; url: string; title: string; excerpt: string; body_text: string | null; body_status: string }[]>`
+    SELECT source_id, url, title, excerpt, body_text, body_status FROM articles WHERE id = ${linkedId}`;
+  assert.equal(linked!.source_id, SOURCE_ID);
   assert.equal(linked!.title, "New chip export rules, explained");
   assert.match(linked!.url, new RegExp(`example\\.org/${T}/export-rules`));
-  assert.match(linked!.excerpt, /What the rule changes\.\n\nShared on X by @reporter: “Worth reading on chip export rules https:\/\/example\.org/);
+  assert.equal(linked!.excerpt, "What the rule changes.");
+  assert.equal(linked!.body_text, null);
   assert.equal(linked!.body_status, "pending", "the article page is still to be fetched");
-  const [plain] = await sql<{ url: string; title: string }[]>`SELECT url, title FROM articles WHERE id = ${await pickArticle(PLAIN)}`;
-  assert.deepEqual(plain, { url: `https://x.com/reporter/status/${PLAIN}`, title: "Huawei just told suppliers it will double its Ascend orders." });
+  const [override] = await sql<{ fields: Record<string, unknown> }[]>`SELECT fields FROM editorial_overrides WHERE article_id = ${linkedId}`;
+  assert.deepEqual(override!.fields, { selected: true, addTags: [TAG], reasonNote: `Editor's pick: https://x.com/reporter/status/${LINKED}` });
 
-  const overrides = await sql<{ fields: Record<string, unknown> }[]>`
-    SELECT fields FROM editorial_overrides WHERE article_id IN (${await pickArticle(LINKED)}, ${await pickArticle(PLAIN)})`;
-  assert.deepEqual(overrides.map((o) => o.fields), [{ selected: true, addTags: [TAG] }, { selected: true, addTags: [TAG] }]);
+  // A post without an article is private heat evidence: no override, no page, not in the pool.
+  const plainId = await pickArticle(PLAIN);
+  const [plain] = await sql<{ source_id: string; mode: string }[]>`
+    SELECT a.source_id, s.participation_mode AS mode FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${plainId}`;
+  assert.deepEqual(plain, { source_id: PRIVATE_SOURCE_ID, mode: "hot_signal" });
+  assert.equal((await sql`SELECT 1 FROM editorial_overrides WHERE article_id = ${plainId}`).length, 0);
+  await publishArticle(plainId);
+  const [pub] = await sql<{ eligible: boolean; selected: boolean }[]>`SELECT eligible, selected FROM publications WHERE article_id = ${plainId}`;
+  assert.deepEqual(pub, { eligible: false, selected: false });
+  assert.equal((await loadItemDetail(plainId)).kind, "not_found");
 
   // Read again: nothing new, nothing taken in twice, the token still valid.
   const second = await syncBookmarks(new Date(Date.now() + 15 * 60_000));
-  assert.deepEqual(second, { pages: 1, new: 0, taken: 0 });
+  assert.deepEqual(second, { pages: 1, new: 0, articles: 0, posts: 0 });
   assert.equal(tokenForms.length, 1);
   assert.equal(bookmarkReads.length, 2);
 });
 
-test("an editor's pick is selected whatever its score and keeps the model's tags beside its own", async () => {
-  const id = await pickArticle(PLAIN);
+test("an editor's pick is selected whatever its score, keeps the model's tags and names its post in the reason", async () => {
+  const id = await pickArticle(LINKED);
   const [a] = await sql<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${id}`;
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, tags, title_zh, summary_zh, score, selected)
-            VALUES (${id}, ${a!.revision}, 'rule', 'pass', 'tech', ${["Semiconductors"]}, '华为加倍昇腾订单', '华为告诉供应商将把昇腾订单翻倍。', 12, false)`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, tags, title_zh, summary_zh, reason_zh, score, selected)
+            VALUES (${id}, ${a!.revision}, 'rule', 'pass', 'policy', ${["Export controls"]}, 'New chip export rules', 'The rule widens the license requirement.',
+                    'It changes who can sell to China.', 12, false)`;
   // Grouping found it adds nothing to a story already selected: an editor's pick is shown all the same.
   await sql`UPDATE articles SET grouping_status = 'complete', grouped_at = now(), selection_adds_value = false WHERE id = ${id}`;
   await publishArticle(id);
-  const [p] = await sql<{ selected: boolean; tags: string[] }[]>`SELECT selected, tags FROM publications WHERE article_id = ${id}`;
+  const [p] = await sql<{ selected: boolean; tags: string[]; reason: string }[]>`SELECT selected, tags, reason FROM publications WHERE article_id = ${id}`;
   assert.equal(p!.selected, true);
-  assert.deepEqual([...p!.tags].sort(), ["Semiconductors", TAG]);
+  assert.deepEqual([...p!.tags].sort(), ["Export controls", TAG]);
+  assert.equal(p!.reason, `It changes who can sell to China. · Editor's pick: https://x.com/reporter/status/${LINKED}`);
 
-  const gold = (await goldRows(sql, "development")).find((row) => row.caseId === `x-pick:${PLAIN}`);
-  assert.equal(gold?.gold.decision, "select");
-  assert.equal(gold?.samplingContext.samplingStratum, "editor-pick");
+  const gold = await goldRows(sql, "development");
+  for (const tweet of [LINKED, PLAIN]) {
+    const row = gold.find((r) => r.caseId === `x-pick:${tweet}`);
+    assert.equal(row?.gold.decision, "select");
+    assert.equal(row?.samplingContext.samplingStratum, "editor-pick");
+  }
 });
 
 test("a prefilter BLOCK stops an item unless it was written up for an editor's pick", () => {

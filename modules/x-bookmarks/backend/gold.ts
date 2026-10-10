@@ -1,4 +1,5 @@
-// The editor's picks as positive cases of a selection gold set (the GoldRow of scripts/eval-selection.ts).
+// Every bookmark (linked articles and the private posts alike) as a positive case of a selection gold set
+// (the GoldRow of scripts/eval-selection.ts). The gold file stays local (.data/), so a post's text never leaves the server.
 // They are scored as ordinary media reports (T2, not first-party): the label says the story itself
 // deserved selection, which is what the threshold should be calibrated to.
 import type { Db } from "@aihot/backend/db";

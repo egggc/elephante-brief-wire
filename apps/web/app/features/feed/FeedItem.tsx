@@ -2,6 +2,7 @@
 // the time in the source line, the bookmark at hand, the reason in one line and duplicate reports
 // behind one button that opens a sheet. One markup, two presentations.
 import { BilingualSummary } from "../item/BilingualSummary";
+import { LinkedText } from "../item/LinkedText";
 import { memo } from "react";
 import { Link } from "react-router";
 import { IntentLink } from "../../components/ui/IntentLink";
@@ -115,7 +116,7 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
 
       {item.reason && (
         <div className="mt-1 lg:mt-3 lg:border-t lg:border-line-soft lg:pt-3">
-          <p className="line-clamp-1 text-[13px] leading-[1.65] text-note lg:line-clamp-none lg:leading-[1.75]">{`${ITEM_COPY.reasonLabel}: `}{item.reason}</p>
+          <p className="line-clamp-1 text-[13px] leading-[1.65] text-note lg:line-clamp-none lg:leading-[1.75]">{`${ITEM_COPY.reasonLabel}: `}<LinkedText text={item.reason} /></p>
         </div>
       )}
 

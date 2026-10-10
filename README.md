@@ -32,12 +32,17 @@ node --env-file=.env scripts/claims-due.ts            # due today, ±3 days
 node --env-file=.env scripts/claims-due.ts --days 90 --window 7 --json
 ```
 
-**Editor's picks from X bookmarks** (`modules/x-bookmarks`). Every 15 minutes the worker reads the editor's new
-X bookmarks (X API v2, OAuth 2.0 user login) and takes each in as source “X — Editor's picks” (T1). A post that links
-an article brings in the article, with the post as context; any other post comes in as itself. Picks are always
-selected, tagged `editor-pick` (topic “Editor's Picks”). Reads are billed and count against the `x_api` budget
-(200 a day by default; adjust it in the admin). Set `X_CLIENT_ID`, `X_CLIENT_SECRET` and `X_REDIRECT_URI` in `.env`,
-then log in once:
+**Editor's picks from X bookmarks** (`modules/x-bookmarks`). Every 15 minutes the worker reads the editor's new X
+bookmarks (X API v2, OAuth 2.0 user login). X's terms do not allow republishing post text, so none is ever public:
+
+- A bookmark that links an article brings in **only the article**, as source “X — Editor's picks” (T1): title and
+  description from the link card, page fetched from the publisher. It is always selected, tagged `editor-pick`
+  (topic “Editor's Picks”), and its “Why it matters” line ends with “Editor's pick: <link to the post>”.
+- A bookmark with no article link is kept privately under “X — Editor's bookmarks”, a heat-only source: admin only,
+  with no page and absent from the lists, RSS, API and reports. It only adds heat to the story it belongs to.
+
+Both kinds count as positive gold labels. Reads are billed and count against the `x_api` budget (200 a day by
+default; adjust it in the admin). Set `X_CLIENT_ID`, `X_CLIENT_SECRET` and `X_REDIRECT_URI` in `.env`, then log in once:
 
 ```bash
 docker compose run --rm worker node scripts/x-auth.ts

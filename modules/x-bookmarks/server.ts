@@ -1,5 +1,5 @@
-// X bookmarks → editor's picks: every 15 minutes the worker reads the editor's new X bookmarks and takes
-// each in as an always-selected item (backend/picks.ts). The login is a one-time step on the server
+// X bookmarks → editor's picks: every 15 minutes the worker reads the editor's new X bookmarks; a linked
+// article becomes an always-selected item, any other post private heat evidence (backend/picks.ts). The login is a one-time step on the server
 // (scripts/x-auth.ts); the callback page only shows the address to paste back into it.
 import { defineServerModule } from "@aihot/backend/modules";
 import { syncBookmarks } from "./backend/picks.ts";

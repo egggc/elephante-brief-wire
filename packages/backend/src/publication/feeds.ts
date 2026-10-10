@@ -3,7 +3,7 @@
 // inline bodies only for sources that explicitly allow redistribution. Titles come from the site's
 // name and categories.
 import { feedCategoryLabel, PUBLIC_API_CATEGORY_KEYS, toPublicApiCategory, type PublicApiCategoryKey } from "@aihot/contracts/taxonomy";
-import { EDITION_WHEN, FEED_COPY, REPORTS, SITE } from "@aihot/site";
+import { EDITION_WHEN, FEED_COPY, ITEM_COPY, REPORTS, SITE } from "@aihot/site";
 import { config } from "../config.ts";
 import { sql } from "../db.ts";
 import { escapeXml } from "../lib/text.ts";
@@ -90,7 +90,7 @@ ${items.join("\n")}
 `;
 }
 
-type FeedRow = Pick<ItemRow, "id" | "title" | "summary" | "url" | "category" | "published_at" | "source_name"> &
+type FeedRow = Pick<ItemRow, "id" | "title" | "summary" | "reason" | "url" | "category" | "published_at" | "source_name"> &
   Partial<Pick<ItemRow, "channel" | "x_post" | "zh_text" | "quoted_zh" | "language"> & {
     syndicate: boolean; body_text: string | null; body_html: string | null; tr_html: string | null; tr_complete: boolean | null;
   }>;
@@ -128,7 +128,9 @@ function fullContent(r: FeedRow, aihot: string): string | null {
 function itemXml(r: FeedRow, includeContent: boolean): string {
   const aihot = itemUrl(r.id);
   const summary = r.summary ?? "";
-  const description = `<p>${escapeXml(summary)}</p>\n<p>🔗 <a href="${escapeXml(r.url)}">Read the original</a></p>\n<p>via ${escapeXml(SITE.name)} · <a href="${aihot}">${aihot}</a></p>`;
+  // The reason line's addresses (an editor's pick names the post it came from) are links.
+  const reason = r.reason ? `<p>${escapeXml(ITEM_COPY.reasonLabel)}: ${escapeXml(r.reason).replace(/https:\/\/[^\s<"]+/g, (u) => `<a href="${u}">${u}</a>`)}</p>\n` : "";
+  const description = `<p>${escapeXml(summary)}</p>\n${reason}<p>🔗 <a href="${escapeXml(r.url)}">Read the original</a></p>\n<p>via ${escapeXml(SITE.name)} · <a href="${aihot}">${aihot}</a></p>`;
   const publicCategory = toPublicApiCategory(r.category);
   const category = publicCategory ? `\n      <category>${escapeXml(feedCategoryLabel(publicCategory))}</category>` : "";
   let content = "";
@@ -166,7 +168,7 @@ export async function itemFeed(kind: ItemFeedKind, category: PublicApiCategoryKe
       SELECT p.article_id FROM publications p WHERE ${scope}
       ORDER BY coalesce(p.published_at, p.discovered_at) DESC, p.article_id DESC LIMIT 50
     )
-    SELECT p.article_id AS id, p.title, p.summary, p.url, p.category, p.published_at, s.name AS source_name
+    SELECT p.article_id AS id, p.title, p.summary, p.reason, p.url, p.category, p.published_at, s.name AS source_name
       ${includeContent ? sql`, p.channel, p.syndicate, a.language, a.x_post,
         CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh,
         left(a.body_text, 400) AS body_text, a.body_html, tr.body_html AS tr_html, tr.complete AS tr_complete` : sql``}

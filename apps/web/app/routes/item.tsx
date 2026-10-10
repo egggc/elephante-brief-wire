@@ -1,4 +1,5 @@
 import { BilingualSummary } from "../features/item/BilingualSummary";
+import { LinkedText } from "../features/item/LinkedText";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Await, isRouteErrorResponse, Link, useAsyncError, useLoaderData, useNavigate, useRevalidator, type ClientLoaderFunctionArgs } from "react-router";
 import type { Route } from "./+types/item";
@@ -200,7 +201,7 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
         {preview.reason && (
           <section className="mt-6 border-t border-line pt-4">
             <div className="mb-1 text-[12px] font-semibold text-ink-3">{ITEM_COPY.reasonLabel}</div>
-            <p className="text-[15px] leading-[1.75] text-ink-2">{preview.reason}</p>
+            <p className="text-[15px] leading-[1.75] text-ink-2"><LinkedText text={preview.reason} /></p>
           </section>
         )}
         <div className="mt-9 space-y-3 border-t border-line pt-6" aria-hidden="true">
@@ -389,7 +390,7 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       {item.reason && !summaryOnly ? (
         <RailSection title={ITEM_COPY.reasonLabel}>
           {verdict && <div className="mb-3">{verdict}</div>}
-          <p className="text-[13.5px] leading-[1.8] text-ink-2">{item.reason}</p>
+          <p className="text-[13.5px] leading-[1.8] text-ink-2"><LinkedText text={item.reason} /></p>
         </RailSection>
       ) : (
         verdict && <RailSection title={shownScore(item.score) !== null ? "AI score" : undefined}>{verdict}</RailSection>
@@ -486,7 +487,7 @@ function ItemView({ item }: { item: SiteItemDetail }) {
           {item.reason && !summaryOnly && (
             <section className="mt-6 border-t border-line pt-4 lg:hidden">
               <div className="mb-1 text-[12px] font-semibold text-ink-3">{ITEM_COPY.reasonLabel}</div>
-              <p className="text-[15px] leading-[1.75] text-ink-2">{item.reason}</p>
+              <p className="text-[15px] leading-[1.75] text-ink-2"><LinkedText text={item.reason} /></p>
             </section>
           )}
 
