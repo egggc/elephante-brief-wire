@@ -1,6 +1,6 @@
 // Checks the selection against your own labelled samples (a "gold set"): each case runs the site's
-// selection steps (editorial/analyze.ts) — the prefilter, then the score prompt twice with every model in
-// --models, the two scores deciding against the source tier's threshold — and is compared with your
+// selection steps (editorial/analyze.ts) — the prefilter, then the score prompt (SCORE_CALLS times) with every
+// model in --models, the score deciding against the source tier's threshold — and is compared with your
 // decision. A threshold sweep shows what another threshold would have done. The gold file has one case
 // per line as GoldRow below describes; lines starting with // are skipped.
 // Usage: node --env-file=.env scripts/eval-selection.ts [--gold .data/gold.jsonl] [--models default,deepseek-flash] [--n 200] [--split all] [--label "..."]

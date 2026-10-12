@@ -1,7 +1,6 @@
 // Selection thresholds. The scoring standard itself is in prompts/selection-score.md; this only decides how many
-// points make the cut. Each item is scored twice, independently (0–100); when the two add up to at least
-// 2 × the threshold and grouping confirms it is not a repeat of a story already selected, it is selected
-// (docs/selection.md). Cards show the mean of the two scores.
+// points make the cut. Each item is scored once (0–100); when the score reaches the threshold and grouping
+// confirms it is not a repeat of a story already selected, it is selected (docs/selection.md). Cards show the score.
 //
 // Elephante Brief's rubric has four axes worth 10 points together, times 10: stakes 0–3 (the higher of the
 // cross-border stakes and the item's significance as U.S. or Chinese business, markets, policy or tech news, so a
@@ -13,13 +12,13 @@
 
 export const SELECTION = {
   /**
-   * Source tier → threshold (mean score). Set each source's tier in the admin under Sources:
+   * Source tier → threshold (score). Set each source's tier in the admin under Sources:
    *   T1 first-party (the government body or company itself) · T1_5 official and semi-official media · T2 media and individuals
    * EXCLUDE_MP and tiers not listed here are not scored for selection (they appear only in "All").
    */
   thresholds: { T1: 50, T1_5: 50, T2: 60 } as Record<string, number>,
   /**
-   * Unselected items with a mean score above this are written up like selected ones (content understanding: both
+   * Unselected items scoring above this are written up like selected ones (content understanding: both
    * headlines, both summaries, the "why it matters" line); the rest get the cheaper headline-and-summary prompt.
    */
   understandFloor: 40,

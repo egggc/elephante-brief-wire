@@ -11,7 +11,7 @@ out every morning at **07:00 Beijing time** (weekly on Mondays at 10:00, monthly
 
 ## How selection works
 
-Every item is scored twice, independently, on four axes (`industry/prompts/selection-score.md`):
+Every item is scored once on four axes (`industry/prompts/selection-score.md`):
 
 | Axis | Points | What it asks |
 |---|---|---|
@@ -20,8 +20,8 @@ Every item is scored twice, independently, on four axes (`industry/prompts/selec
 | Seam asymmetry | 0–2 | Big in one language, thin or framed differently in the other (tagged `one-side-only`). |
 | Quiet signal | 0–2 | Low heat, high stakes: draft rules, procurement, licensing, personnel and hiring shifts (tagged `quiet-signal`). |
 
-The score is 10 × the sum (0–100), capped at 20 only for items that are neither cross-border nor major business, markets, policy or tech news. Asymmetry and quiet signal are bonuses. An item is selected when the two
-scores average at least its source tier's threshold (`industry/selection.ts`) and grouping confirms it is not a repeat.
+The score is 10 × the sum (0–100), capped at 20 only for items that are neither cross-border nor major business, markets, policy or tech news. Asymmetry and quiet signal are bonuses. An item is selected when its
+score reaches its source tier's threshold (`industry/selection.ts`) and grouping confirms it is not a repeat.
 Cultural signals are tagged `culture`.
 
 **Claims ledger.** The structure step extracts every checkable claim or forecast (speaker, claim, deadline, quote) and

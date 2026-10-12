@@ -44,12 +44,12 @@ export const ANALYZE_PROMPT_VERSION = Object.values(PROMPT_VERSIONS).join("+");
 
 // Scoring
 
-/** Independent score calls per article; their sum decides, their mean (floored) is shown. */
-export const SCORE_CALLS = 2;
+/** Score calls per article: one, selected when its score reaches the tier threshold. With more, their sum decides and their mean (floored) is shown. */
+export const SCORE_CALLS = 1;
 
 /**
- * The thresholds on the mean score, per source tier (industry/selection.ts): selected when
- * score1 + score2 >= 2 × threshold. Tiers without a threshold are not scored for 精选.
+ * The score thresholds per source tier (industry/selection.ts): selected when the score >= threshold.
+ * Tiers without a threshold are not scored for 精选.
  */
 export function tierThreshold(tier: string): number | null {
   return SELECTION.thresholds[tier] ?? null;
@@ -211,7 +211,7 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
 export interface AnalysisRun {
   prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number; reused: boolean };
   /**
-   * The independent score calls and the tier threshold they are held against; absent when the material
+   * The score calls (SCORE_CALLS) and the tier threshold they are held against; absent when the material
    * is not scored. `refused`: the model's content filter declined it, so it is not selected.
    */
   scores: { model: string; threshold: number; values: number[]; receiptIds: number[]; reused: boolean; refused?: boolean } | null;
@@ -301,7 +301,7 @@ async function runScores(
   const values: number[] = [];
   const receiptIds: number[] = [];
   let reused = true;
-  // One after the other: the second call reuses the provider's cached prompt.
+  // With more than one call, one after the other: a later call reuses the provider's cached prompt.
   for (let i = 0; i < SCORE_CALLS; i++) {
     checkAnalysisRunning();
     try {
@@ -461,8 +461,8 @@ export function normalizeAnalysis(run: AnalysisRun) {
   const summaryZh = (run.writing?.summaryZh ?? "").trim();
   // Original posts can consist entirely of media. Model-written copy still needs a title and summary.
   const relevance = label === "BLOCK" && !run.writing ? "block" : !run.writing || !titleZh || (!summaryZh && run.writing.kind !== "verbatim") ? "unknown" : "pass";
-  // Selected when the two scores add up to twice the tier threshold; the mean, floored, is the score
-  // shown (it never decides a half point on its own).
+  // Selected when the score reaches the tier threshold (with several calls: when their sum reaches the
+  // threshold times the calls; the mean, floored, is shown and never decides a half point on its own).
   const values = run.scores && !run.scores.refused ? run.scores.values : null;
   const sum = values?.length === SCORE_CALLS ? values.reduce((total, v) => total + v, 0) : null;
   const score = sum === null ? null : Math.floor(sum / SCORE_CALLS);
