@@ -5,10 +5,12 @@
 //      (clusters.ts). A story already picked or analysed takes in its new reports without a call; each
 //      story's coverage (distinct sources, by language) is counted for free.
 //   2. The new stories, `batchSize` per call, as headline, snippet and coverage: the model returns its picks
-//      with a score and a reason (prompts/triage.md, the selection standard at headline level).
-//   3. The best picks across the calls, as many as the month's budget allows (pickAllowance), go back to
-//      'new': the sweep queues them, and they are scored and written up like any item, the triage standing
-//      in for their prefilter. The rest are left out ('skipped'); they still count as coverage later.
+//      with a score on the selection standard's scale and a reason (prompts/triage.md). The instructions
+//      are the system message, the same on every call, so the provider can cache them.
+//   3. The triage score decides selection: picks below their source tier's threshold are dropped. The best
+//      of the rest across the calls, as many as the month's budget allows (pickAllowance), go back to
+//      'new': the sweep queues them, and one call each writes them up and extracts their structure
+//      (editorial/analyze.ts runPick). The rest are left out ('skipped'); they still count as coverage later.
 // Each pass records what it saw, picked and spent (triage_passes) and pings healthchecks when it completes.
 import { TRIAGE } from "@aihot/site";
 import { z } from "zod";
@@ -16,13 +18,20 @@ import { sql } from "../db.ts";
 import { collapseWhitespace } from "../lib/text.ts";
 import { pingSuccess } from "../operations/healthchecks.ts";
 import { chatJson } from "../providers/llm.ts";
+import { completeReceipt } from "../providers/receipts.ts";
+import { tierThreshold } from "./analyze.ts";
 import { clusterItems } from "./clusters.ts";
 import { modelFor } from "./models.ts";
 import { promptText, promptVersion } from "./prompts.ts";
 
 export const TRIAGE_PROMPT_VERSION = promptVersion("triage");
-/** What one pick and one pass cost before there is a week of history to measure (US dollars). */
-const PRIOR = { pick: 0.01, pass: 0.01 };
+const TRIAGE_SYSTEM = promptText("triage");
+/**
+ * What one pick and one pass cost before there is a week of history to measure (US dollars): a pick is one
+ * write-up call (about 7k cached instruction tokens, 2k of material, 2.5k out with the reasoning) plus its
+ * share of grouping and event overviews; a pass is two lists.
+ */
+const PRIOR = { pick: 0.0045, pass: 0.009 };
 
 /**
  * Called by the analysis job (jobs/content.ts) before any model call: true when the article waits for the
@@ -116,6 +125,15 @@ async function passCost(passId: string): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
+/** Input tokens of the default model's calls since a time, and how many of them the provider read from its cache. */
+async function cacheUse(since: Date) {
+  const [row] = await sql<{ input: string | null; cached: string | null }[]>`
+    SELECT sum((usage->>'prompt_tokens')::bigint) AS input, sum((usage->'prompt_tokens_details'->>'cached_tokens')::bigint) AS cached
+    FROM receipts WHERE service = 'llm' AND created_at >= ${since} AND usage ? 'prompt_tokens'`;
+  const input = Number(row?.input ?? 0), cached = Number(row?.cached ?? 0);
+  return { inputTokens: input, cachedTokens: cached, hitRate: input ? Math.round((cached / input) * 1000) / 1000 : 0 };
+}
+
 /**
  * How many picks this pass may make: TRIAGE.picksPerPass, fewer when MODEL_MONTHLY_BUDGET_USD is set and
  * what is left of it, spread over the month's remaining passes, pays for fewer. A pick's cost is measured
@@ -169,7 +187,9 @@ export async function triagePass(now = new Date()): Promise<Record<string, unkno
   const [pass] = await sql<{ id: string }[]>`INSERT INTO triage_passes (started_at) VALUES (${now}) RETURNING id`;
   const passId = pass!.id;
   const chosen: Array<{ story: Story; score: number; reason: string; receiptId: number }> = [];
+  const receipts: number[] = [];
   let batches = 0;
+  let belowThreshold = 0;
   if (allowance.picks > 0 && fresh.length) {
     const model = await modelFor("triage");
     for (let start = 0; start < fresh.length; start += TRIAGE.batchSize) {
@@ -179,14 +199,18 @@ export async function triagePass(now = new Date()): Promise<Record<string, unkno
       batches += 1;
       const res = await chatJson({
         model, purpose: "triage_batch", subject: `triage:${passId}:${batches}`, promptVersion: TRIAGE_PROMPT_VERSION,
-        system: promptText("triage", { picks: String(k) }), user: batch.map((s, i) => storyLine(i + 1, s)).join("\n"),
+        system: TRIAGE_SYSTEM, user: [`Pick at most ${k} of these ${batch.length} stories.`, ...batch.map((s, i) => storyLine(i + 1, s))].join("\n"),
         schema: TriageSchema, temperature: 0.2, maxTokens: 300 + k * 60, timeoutMs: 180_000,
       });
+      receipts.push(res.receiptId);
       const named = new Set<number>();
       for (const p of res.data.picks) {
         const story = batch[p.n - 1];
         if (!story || named.has(p.n) || named.size >= k) continue;
         named.add(p.n);
+        // The triage score decides selection: a pick below its source tier's threshold is not written up.
+        const threshold = tierThreshold(story.rep.tier);
+        if (threshold === null || p.score < threshold) { belowThreshold += 1; continue; }
         chosen.push({ story, score: Math.round(p.score), reason: p.reason, receiptId: res.receiptId });
       }
     }
@@ -207,6 +231,7 @@ export async function triagePass(now = new Date()): Promise<Record<string, unkno
       const pick = s.members.find((m) => m.picked);
       if (pick) await tx`UPDATE triage_picks SET coverage = ${s.coverage}, members = ${s.members.map((m) => m.id)} WHERE article_id = ${pick.id}`;
     }
+    for (const id of receipts) await completeReceipt(tx, id);
     const reps = picks.map((p) => p.story.rep.id);
     await tx`UPDATE articles SET processing_state = 'skipped'
              WHERE id = ANY(${waiting.map((w) => w.id).filter((id) => !reps.includes(id))}) AND processing_state = 'triage'`;
@@ -219,6 +244,7 @@ export async function triagePass(now = new Date()): Promise<Record<string, unkno
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
   const elapsedDays = Math.max(1, (now.getTime() - monthStart.getTime()) / 86400_000);
   const spentMonth = await spentSince(monthStart);
+  const cache = await cacheUse(new Date(now.getTime() - 86400_000));
   const cost = {
     triage: money(triageCost),
     picksEstimate: money(picks.length * (allowance.costPerPick ?? PRIOR.pick)),
@@ -226,15 +252,17 @@ export async function triagePass(now = new Date()): Promise<Record<string, unkno
     monthToDate: money(spentMonth),
     monthProjected: money((spentMonth / elapsedDays) * daysInMonth),
     budget: allowance.budget,
+    cache24h: cache,
   };
   const summary = {
     waiting: waiting.length, aged: aged.length, stories: stories.length, covered: covered.length, sent: fresh.length, batches,
-    picked: picks.length, allowance, cost,
+    belowThreshold, picked: picks.length, allowance, cost,
   };
   await sql`UPDATE triage_passes SET finished_at = now(), summary = ${sql.json(summary as never)}, cost_usd = ${cost.triage} WHERE id = ${passId}`;
   const line = `triage pass ${passId}: ${waiting.length} new items, ${fresh.length} new stories in ${batches} calls, ${picks.length} picked; `
     + `cost $${cost.triage.toFixed(4)} triage + ~$${cost.picksEstimate.toFixed(4)} for the picks; last 24 h $${cost.last24h.toFixed(4)}, `
-    + `month $${cost.monthToDate.toFixed(2)} (at this pace $${cost.monthProjected.toFixed(2)}${cost.budget ? ` of $${cost.budget.toFixed(2)}` : ""})`;
+    + `month $${cost.monthToDate.toFixed(2)} (at this pace $${cost.monthProjected.toFixed(2)}${cost.budget ? ` of $${cost.budget.toFixed(2)}` : ""}); `
+    + `cache hits ${Math.round(cache.hitRate * 100)}% of ${cache.inputTokens} input tokens in 24 h`;
   console.log(line);
   await pingSuccess(line);
   return summary;

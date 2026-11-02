@@ -1,5 +1,6 @@
 // Selection thresholds. The scoring standard itself is in prompts/selection-score.md; this only decides how many
-// points make the cut. Each item is scored once (0–100); when the score reaches the threshold and grouping
+// points make the cut. With batch triage on (site/site.ts TRIAGE), the triage score (prompts/triage.md, the
+// same four axes at headline level) is the score held against these thresholds, and nothing scores a pick again. Each item is scored once (0–100); when the score reaches the threshold and grouping
 // confirms it is not a repeat of a story already selected, it is selected (docs/selection.md). Cards show the score.
 //
 // Elephante Brief's rubric has four axes worth 10 points together, times 10: stakes 0–3 (the higher of the

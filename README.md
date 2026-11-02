@@ -15,11 +15,14 @@ out every morning at **07:00 Beijing time** (weekly on Mondays at 10:00, monthly
 by one. They are deduplicated and grouped into stories by headline for free, and each story's coverage (how many
 independent sources report it, in which languages) is counted as a free heat signal. Twice a day (06:15 and 12:15
 Beijing time, the first ahead of the daily edition) the model reads the new stories 100 to a list, as headline,
-snippet and coverage, and picks up to 25 per pass by the same standard. Only those picks are scored and written up.
-`MODEL_MONTHLY_BUDGET_USD` lowers the picks when the month's spend runs ahead of the budget. Every pass logs what it
-cost, and a 402/403 from OpenRouter fails the `HEALTHCHECKS_URL` check at once.
+snippet and coverage, and picks up to 25 per pass, scoring each on the four axes below. **The triage score decides
+selection**: a pick below its source tier's threshold is dropped; the rest get one call each that writes the English
+and Chinese headlines and summaries and extracts the structure (`industry/prompts/pick.md`). The fixed instructions
+come first in every call so OpenRouter can cache them. `MODEL_MONTHLY_BUDGET_USD` lowers the picks when the month's
+spend runs ahead of the budget. Every pass logs what it cost, with the share of input read from the cache, and a
+402/403 from OpenRouter fails the `HEALTHCHECKS_URL` check at once.
 
-Every pick is scored once on four axes (`industry/prompts/selection-score.md`):
+The four axes (`industry/prompts/selection-score.md`, applied at headline level by `industry/prompts/triage.md`):
 
 | Axis | Points | What it asks |
 |---|---|---|

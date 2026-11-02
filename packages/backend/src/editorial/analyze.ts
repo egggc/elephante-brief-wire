@@ -37,6 +37,7 @@ export const PROMPT_VERSIONS = {
   understand: promptVersion("understand"),
   summarize: promptVersion("summarize-article", "summarize-article-empty", "summarize-short-post", "summarize-short-post-quoted", "summarize-long-post", "summarize-long-post-quoted", "identity-context"),
   structure: promptVersion("structure"),
+  pick: promptVersion("pick"),
 } as const;
 /** Every step's prompt, as stored on each judgement. */
 export const SELECTION_PROMPT_VERSION = [PROMPT_VERSIONS.prefilter, PROMPT_VERSIONS.score].join("+");
@@ -167,15 +168,24 @@ const SummarizeSchema = z.object({
 
 const COUNT = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 
-/** The structure step owns the public category and tags, as well as grouping evidence (filled from the pack's vocabulary). */
-export const STRUCTURE_SYSTEM = promptText("structure", {
+const STRUCTURE_VALUES = {
   categoryCount: COUNT[CATEGORIES.length] ?? String(CATEGORIES.length),
   categoryGuide: CATEGORY_GUIDE,
   categoryTags: CATEGORY_TAGS.join(", "),
   topicTags: TOPIC_TAGS.join(", "),
   entityTags: ENTITY_TAGS.join(", "),
   entities: Object.entries(ENTITIES).map(([id, e]) => `${id} (${e.aliases.slice(0, 3).join("/")})`).join(", "),
-});
+};
+
+/** The structure step owns the public category and tags, as well as grouping evidence (filled from the pack's vocabulary). */
+export const STRUCTURE_SYSTEM = promptText("structure", STRUCTURE_VALUES);
+
+/**
+ * A triage pick's one call: the content understanding and the structure together (prompts/pick.md). The
+ * instructions are the whole system message, the same for every pick, so the provider can cache them.
+ */
+export const PICK_SYSTEM = promptText("pick", STRUCTURE_VALUES);
+const PickSchema = StructureSchema.extend(UnderstandSchema.omit({ tags: true }).shape);
 
 /** Keep only quotes present both in the original material and in the text the structure model saw. */
 export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: AnalyzeInputArticle) {
@@ -354,39 +364,64 @@ export async function runStructure(a: AnalyzeInputArticle, opts: StepOpts = {}):
   return { ...normalizeStructure(res.data, a), model: res.model, receiptId: res.receiptId, reused: res.reused };
 }
 
-/** Content understanding grounded in the original; null on a content-filter refusal. */
-export async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun["writing"]> {
-  const model = await modelFor("understand");
+/**
+ * A call that reads the material as the content understanding does, with the article's first image when
+ * the model reads images; null on a content-filter refusal. An image the model refuses is left out.
+ */
+async function understandingCall<S extends z.ZodType>(a: AnalyzeInputArticle, opts: StepOpts,
+  step: { capability: string; purpose: string; promptVersion: string; system: string; schema: S }) {
+  const model = await modelFor(step.capability);
   const text = understandUser(a);
   const call = (image: ContentPart | null) => {
     checkAnalysisRunning();
     return chatJson({
-      model, purpose: "understand_article", subject: subjectOf(a), promptVersion: PROMPT_VERSIONS.understand, system: UNDERSTAND_SYSTEM,
-      user: image ? [{ type: "text", text }, image] : text, schema: UnderstandSchema, temperature: 0.2, maxTokens: 16_384,
-      timeoutMs: 180_000, attemptTag: tagged(opts.attemptTag, "understand"),
+      model, purpose: step.purpose, subject: subjectOf(a), promptVersion: step.promptVersion, system: step.system,
+      user: image ? [{ type: "text", text }, image] : text, schema: step.schema, temperature: 0.2, maxTokens: 16_384,
+      timeoutMs: 180_000, attemptTag: tagged(opts.attemptTag, step.capability),
     });
   };
   // Image input is opt-in: an unspecified capability must not become a paid provider probe.
   const image = modelSupportsVision(model) ? await firstImagePart(a) : null;
-  let res: Awaited<ReturnType<typeof call>>;
   try {
-    res = await call(image);
+    return await call(image);
   } catch (error) {
     if (isContentFilter(error)) return null;
     // The model refused the image (download, format): the text is written without it.
     if (!image || !(error instanceof ProviderRejectedError) || error.retryable) throw error;
     try {
-      res = await call(null);
+      return await call(null);
     } catch (retryError) {
       if (isContentFilter(retryError)) return null;
       throw retryError;
     }
   }
-  const d = res.data;
+}
+
+/** The understanding's copy as the reader-facing writing. */
+function understoodWriting(a: AnalyzeInputArticle, res: { model: string; receiptId: number; reused: boolean },
+  d: Pick<z.infer<typeof UnderstandSchema>, "itemType" | "authorRole" | "editorialJudgment" | "titleEn" | "summaryEn" | "titleZh" | "summaryZh">): NonNullable<AnalysisRun["writing"]> {
   const copy = finalizeCopy(translateInputOf(a), { titleEn: d.titleEn, summaryEn: d.summaryEn, titleZh: d.titleZh, summaryZh: d.summaryZh });
   return {
     kind: "understand", model: res.model, titleZh: copy.titleZh, summaryZh: copy.summaryZh, reasonZh: d.editorialJudgment.trim() || null,
     itemType: d.itemType, authorRole: d.authorRole, identityGuard: copy.identityGuard, receiptIds: [res.receiptId], reused: res.reused,
+  };
+}
+
+/** Content understanding grounded in the original; null on a content-filter refusal. */
+export async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun["writing"]> {
+  const res = await understandingCall(a, opts, {
+    capability: "understand", purpose: "understand_article", promptVersion: PROMPT_VERSIONS.understand, system: UNDERSTAND_SYSTEM, schema: UnderstandSchema,
+  });
+  return res ? understoodWriting(a, res, res.data) : null;
+}
+
+/** A pick's write-up and structure from one call (PICK_SYSTEM); null on a content-filter refusal. */
+async function runPickWriteUp(a: AnalyzeInputArticle, opts: StepOpts): Promise<Pick<AnalysisRun, "writing" | "structure"> | null> {
+  const res = await understandingCall(a, opts, { capability: "pick", purpose: "pick_article", promptVersion: PROMPT_VERSIONS.pick, system: PICK_SYSTEM, schema: PickSchema });
+  if (!res) return null;
+  return {
+    writing: understoodWriting(a, res, res.data),
+    structure: { ...normalizeStructure(res.data, a), model: res.model, receiptId: res.receiptId, reused: res.reused },
   };
 }
 
@@ -429,10 +464,8 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
 /** Runs the steps on the material as it is (or reuses their receipts) without writing business results. */
 export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun> {
   checkAnalysisRunning();
-  // A batch triage pick was judged in its list: that judgement stands for the prefilter.
-  const prefilter: AnalysisRun["prefilter"] = a.triage
-    ? { label: "PASS", reason: `triage: ${a.triage.reason}`.slice(0, 200), model: "triage", receiptId: a.triage.receiptId, reused: true }
-    : await runSelectionPrefilter(a, opts);
+  if (a.triage) return runPick(a, a.triage, opts);
+  const prefilter = await runSelectionPrefilter(a, opts);
   // Missing article text waits for a later revision; displayable original posts keep their judgement.
   // An item an editor selected is written up whatever the prefilter says.
   if (prefilter.label === "BLOCK" && !a.editorSelected) return { prefilter, scores: null, writing: null, structure: null };
@@ -455,6 +488,29 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
     // still owns a response. It settles and stores its receipt before shutdown can close the DB.
     await structure;
   }
+}
+
+/**
+ * A batch triage pick (editorial/triage.ts) was judged in its list: that judgement stands for the prefilter
+ * and its score for the score call. One call writes it up and extracts its structure; a displayable original
+ * post keeps its own words and needs only the structure.
+ */
+async function runPick(a: AnalyzeInputArticle, triage: NonNullable<AnalyzeInputArticle["triage"]>, opts: StepOpts): Promise<AnalysisRun> {
+  const prefilter: AnalysisRun["prefilter"] = { label: "PASS", reason: `triage: ${triage.reason}`.slice(0, 200), model: "triage", receiptId: triage.receiptId, reused: true };
+  const original = originalPostCopy(a.xPost, a.url);
+  if (missingEvidence(a) && !original) return { prefilter, scores: null, writing: null, structure: null };
+  const threshold = tierThreshold(a.source.tier);
+  const scores = threshold === null || triage.score === null ? null
+    : { model: "triage", threshold, values: Array.from({ length: SCORE_CALLS }, () => triage.score!), receiptIds: [], reused: true };
+  if (original) {
+    const verbatim = { kind: "verbatim" as const, model: null, titleZh: original.title, summaryZh: original.summary ?? "", reasonZh: null, receiptIds: [], reused: true };
+    return { prefilter, scores, writing: verbatim, structure: await runStructure(a, opts) };
+  }
+  const written = await runPickWriteUp(a, opts);
+  if (written) return { prefilter, scores, ...written };
+  // The content filter declined the combined call: the separate structure and plain title/summary steps.
+  const structure = await runStructure(a, opts);
+  return { prefilter, scores, writing: await runSummarize(a, opts), structure };
 }
 
 /** One judgement from the steps: the selection rule, the reader-facing copy and the structure. */
@@ -518,9 +574,10 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
   if (waitsForPage(input)) return { analysisId: null, stale: false, needsBody: true, output: null, receiptIds: [], reused: true };
   const run = await runAnalysis(input, opts);
   const out = normalizeAnalysis(run);
-  const receiptIds = [
+  // A pick's write-up and structure share one receipt.
+  const receiptIds = [...new Set([
     run.prefilter.receiptId, ...(run.scores?.receiptIds ?? []), ...(run.writing?.receiptIds ?? []), ...(run.structure ? [run.structure.receiptId] : []),
-  ];
+  ])];
   const w = run.writing;
   const detail = {
     prefilter: { label: run.prefilter.label, reason: run.prefilter.reason },

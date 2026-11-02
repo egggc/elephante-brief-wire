@@ -20,6 +20,7 @@ export interface Capability {
 
 export const CAPABILITIES = {
   triage: { label: "Batch triage (twice a day: picks the stories worth a write-up from lists of headlines; site/site.ts TRIAGE)", env: "TRIAGE_MODEL", default: DEFAULTS.triage ?? "default", purposes: ["triage_batch"] },
+  pick: { label: "Picked-story write-up (for triage picks: English and Chinese headlines, summaries, why-it-matters, and the structure, in one call)", env: "PICK_MODEL", default: DEFAULTS.pick ?? "default", purposes: ["pick_article"] },
   prefilter: { label: "Prefilter (does it belong here; broad recall; with triage on, only items an editor selected or an admin re-evaluates)", env: "PREFILTER_MODEL", default: DEFAULTS.prefilter ?? "default", purposes: ["prefilter_article"] },
   score: { label: "Selection score (held against the tier threshold)", env: "SCORE_MODEL", default: DEFAULTS.score ?? "default", purposes: ["score_article"] },
   understand: { label: "Content understanding (English and Chinese headlines, summaries and why-it-matters for selected and near-selected items; reads the first image when it can)", env: "UNDERSTAND_MODEL", default: DEFAULTS.understand ?? "default", purposes: ["understand_article"] },

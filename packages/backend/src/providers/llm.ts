@@ -21,6 +21,8 @@ export interface ModelSpec {
   reasoningTokens?: number;
   jsonMode: boolean;
   vision?: boolean;
+  /** Mark the system message as a cache breakpoint (cache_control), for providers that cache only where told. */
+  cacheControl?: boolean;
 }
 
 function extraFromEnv(value: string | undefined): Record<string, unknown> | undefined {
@@ -47,6 +49,7 @@ export const MODELS: Record<string, ModelSpec> = {
     get reasoningTokens() { return reasoningTokensFromEnv(process.env.LLM_REASONING_TOKENS); },
     get jsonMode() { return process.env.LLM_JSON_MODE !== "false"; },
     get vision() { return process.env.LLM_VISION === "true"; },
+    get cacheControl() { return process.env.LLM_CACHE_CONTROL === "true"; },
   },
   // The pack's named presets, each with its own address and key.
   ...Object.fromEntries(Object.entries(PRESETS).map(([key, preset]) => [key, { key, ...preset }])),
@@ -133,18 +136,28 @@ function usdPerMillion(value: string | undefined): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/** Input tokens the provider read from its prompt cache (OpenAI-style usage.prompt_tokens_details.cached_tokens). */
+function cachedTokens(usage: Record<string, unknown> | null): number {
+  const details = usage?.prompt_tokens_details as { cached_tokens?: unknown } | undefined;
+  return typeof details?.cached_tokens === "number" ? details.cached_tokens : 0;
+}
+
 /**
  * What an answer cost: the provider's own figure when it gives one (OpenRouter's usage.cost, in US
- * dollars), else for the default model its tokens at LLM_INPUT_USD_PER_M and LLM_OUTPUT_USD_PER_M
- * (reasoning tokens are output tokens). Null when neither is known.
+ * dollars), else for the default model its tokens at LLM_INPUT_USD_PER_M, cache reads at
+ * LLM_CACHED_INPUT_USD_PER_M (the input price when unset) and output at LLM_OUTPUT_USD_PER_M (reasoning
+ * tokens are output tokens). Null when neither is known.
  */
 export function answerCost(modelKey: string, usage: Record<string, unknown> | null): CallOutcome["cost"] {
   if (!usage) return null;
   if (typeof usage.cost === "number" && Number.isFinite(usage.cost)) return { amount: usage.cost, currency: "USD", basis: "actual" };
   const input = usdPerMillion(process.env.LLM_INPUT_USD_PER_M), output = usdPerMillion(process.env.LLM_OUTPUT_USD_PER_M);
   if (modelKey !== "default" || input === null || output === null) return null;
+  const cachedPrice = usdPerMillion(process.env.LLM_CACHED_INPUT_USD_PER_M) ?? input;
   const tokens = (key: string) => (typeof usage[key] === "number" ? (usage[key] as number) : 0);
-  return { amount: (tokens("prompt_tokens") * input + tokens("completion_tokens") * output) / 1e6, currency: "USD", basis: "estimated" };
+  const cached = Math.min(cachedTokens(usage), tokens("prompt_tokens"));
+  const amount = (tokens("prompt_tokens") - cached) * input + cached * cachedPrice + tokens("completion_tokens") * output;
+  return { amount: amount / 1e6, currency: "USD", basis: "estimated" };
 }
 
 export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): Promise<ChatJsonResult<z.infer<S>>> {
@@ -161,8 +174,9 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
   const body: Record<string, unknown> = {
     model: spec.model,
     messages: [
-      // A prompt given as one user message (the title/summary prompts) has no system message.
-      ...(opts.system ? [{ role: "system", content: opts.system }] : []),
+      // A prompt given as one user message (the title/summary prompts) has no system message. The system
+      // message comes first and holds only fixed instructions, so its tokens are a prefix the provider can cache.
+      ...(opts.system ? [{ role: "system", content: spec.cacheControl ? [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }] : opts.system }] : []),
       // Multimodal parts go through as parts; plain objects are sent as JSON text.
       { role: "user", content: typeof opts.user === "string" || Array.isArray(opts.user) ? opts.user : userText },
     ],
