@@ -429,7 +429,10 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
 /** Runs the steps on the material as it is (or reuses their receipts) without writing business results. */
 export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun> {
   checkAnalysisRunning();
-  const prefilter = await runSelectionPrefilter(a, opts);
+  // A batch triage pick was judged in its list: that judgement stands for the prefilter.
+  const prefilter: AnalysisRun["prefilter"] = a.triage
+    ? { label: "PASS", reason: `triage: ${a.triage.reason}`.slice(0, 200), model: "triage", receiptId: a.triage.receiptId, reused: true }
+    : await runSelectionPrefilter(a, opts);
   // Missing article text waits for a later revision; displayable original posts keep their judgement.
   // An item an editor selected is written up whatever the prefilter says.
   if (prefilter.label === "BLOCK" && !a.editorSelected) return { prefilter, scores: null, writing: null, structure: null };

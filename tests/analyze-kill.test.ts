@@ -39,7 +39,9 @@ const children = new Set<ReturnType<typeof spawn>>();
 // analyze-shutdown.test.ts separately covers pg-boss delivery and graceful queue shutdown.
 function worker(articleId: string) {
   const script = `
+    import { TRIAGE } from '@aihot/site';
     import { processArticle } from '@aihot/backend/jobs/content';
+    TRIAGE.enabled = false;
     import { stopBoss } from '@aihot/backend/jobs/queue';
     import { closeDb } from '@aihot/backend/db';
     try {

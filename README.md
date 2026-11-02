@@ -11,7 +11,15 @@ out every morning at **07:00 Beijing time** (weekly on Mondays at 10:00, monthly
 
 ## How selection works
 
-Every item is scored once on four axes (`industry/prompts/selection-score.md`):
+**Batch triage first** (`site/site.ts` `TRIAGE`, `docs/selection.md`). Collected items are not sent to the model one
+by one. They are deduplicated and grouped into stories by headline for free, and each story's coverage (how many
+independent sources report it, in which languages) is counted as a free heat signal. Twice a day (06:15 and 12:15
+Beijing time, the first ahead of the daily edition) the model reads the new stories 100 to a list, as headline,
+snippet and coverage, and picks up to 25 per pass by the same standard. Only those picks are scored and written up.
+`MODEL_MONTHLY_BUDGET_USD` lowers the picks when the month's spend runs ahead of the budget. Every pass logs what it
+cost, and a 402/403 from OpenRouter fails the `HEALTHCHECKS_URL` check at once.
+
+Every pick is scored once on four axes (`industry/prompts/selection-score.md`):
 
 | Axis | Points | What it asks |
 |---|---|---|

@@ -1,0 +1,1 @@
+ALTER TABLE articles VALIDATE CONSTRAINT articles_processing_state_valid;

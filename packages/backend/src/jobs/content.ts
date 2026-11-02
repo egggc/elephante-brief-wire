@@ -8,6 +8,7 @@ import type { PgBoss } from "pg-boss";
 import { sql, type Db } from "../db.ts";
 import { extractArticleBody, pageFetchable } from "../content/extract.ts";
 import { analyzeArticle, AnalysisInterruptedError } from "../editorial/analyze.ts";
+import { holdForTriage } from "../editorial/triage.ts";
 import { isHistorical } from "../content/materials.ts";
 import { publishArticle } from "../publication/publish.ts";
 import { BudgetExceededError, ProviderRejectedError, ReceiptBusyError, ReceiptUnknownError } from "../providers/receipts.ts";
@@ -127,6 +128,9 @@ async function processRevision(articleId: string, row: NonNullable<Awaited<Retur
     if (group) await enqueue(QUEUES.group, { articleId, signalOnly: true }, { singletonKey: articleId, priority: PRIORITY.liveSignal });
     return { state: "skipped" };
   }
+  // Before any model call: unless picked (or selected by an editor, or re-evaluated from the admin), it
+  // waits for the next batch triage pass.
+  if (!opts.attemptTag && await holdForTriage(articleId, row.revision, row.historical)) return { state: "triage" };
   try {
     const result = await analyzeArticle(articleId, { attemptTag: opts.attemptTag });
     if (!result) return { state: "missing" };
@@ -160,9 +164,11 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
   // failure and must neither consume processing_attempts nor turn an incomplete chain terminal.
   if (error instanceof AnalysisInterruptedError || shutdownSignal.signal.aborted) throw error;
   const message = String(error instanceof Error ? error.message : error).slice(0, 500);
-  if (error instanceof ReceiptBusyError || error instanceof BudgetExceededError) {
+  // Out of credit (HTTP 402) is not the article's fault either: it waits an hour at a time until topped up.
+  const unpaid = error instanceof ProviderRejectedError && error.status === 402;
+  if (error instanceof ReceiptBusyError || error instanceof BudgetExceededError || unpaid) {
     // Not the article's fault: the same request is in flight, or the budget window is full.
-    const seconds = error instanceof BudgetExceededError ? error.retryAfterSeconds : 60;
+    const seconds = error instanceof BudgetExceededError ? error.retryAfterSeconds : unpaid ? 3600 : 60;
     const retryAt = new Date(Date.now() + seconds * 1000);
     await sql`UPDATE articles SET processing_state = 'new', processing_error = ${message}, processing_retry_at = ${retryAt}, processing_queued_at = NULL
               WHERE id = ${articleId} AND revision = ${revision}`;
@@ -171,7 +177,8 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
   const [a] = await sql<{ processing_attempts: number }[]>`SELECT processing_attempts FROM articles WHERE id = ${articleId} AND revision = ${revision}`;
   if (!a) return { state: "stale" };
   const attempts = a.processing_attempts + 1;
-  const refused = error instanceof ProviderRejectedError && !error.retryable;
+  // A 403 is a key's credit limit as often as a refusal of the material: retried like passing trouble, then failed.
+  const refused = error instanceof ProviderRejectedError && !error.retryable && error.status !== 403;
   const exhausted = attempts > RETRY_MINUTES.length || (error instanceof ModelOutputError && attempts >= MAX_OUTPUT_FAILURES);
   if (refused || exhausted) {
     await sql`UPDATE articles SET processing_state = 'failed', processing_error = ${message}, processing_attempts = ${attempts},

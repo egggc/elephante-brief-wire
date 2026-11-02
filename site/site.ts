@@ -18,6 +18,23 @@ export const EDITION_WHEN = {
   monthly: `on the 1st of each month at ${EDITION_TIMES.monthly}`,
 };
 
+/**
+ * Batch triage (packages/backend/src/editorial/triage.ts), so the model reads a few lists a day instead of
+ * every item. Collected items are deduplicated and grouped into stories by headline, for free; at each
+ * time (Beijing time, HH:mm) the model reads the new stories `batchSize` at a time, as headline, snippet and
+ * coverage, and picks the best; only those picks are scored and written up. The first pass runs ahead of
+ * the daily edition so its picks are written in time. MODEL_MONTHLY_BUDGET_USD (in .env) lowers the picks
+ * when the month's spend runs ahead of the budget.
+ */
+export const TRIAGE = {
+  enabled: true,
+  times: ["06:15", "12:15"],
+  batchSize: 100,
+  picksPerPass: 25,
+  /** Stories are grouped, and their coverage counted, over this many hours; older unpicked items are left out. */
+  windowHours: 48,
+};
+
 export const SITE = {
   /** Site name: navigation, page titles, share cards, RSS, MCP and the admin all use it. */
   name: "Elephante Brief",

@@ -44,6 +44,8 @@ function worker(queue: string) {
   const script = `
     import { getBoss, stopBoss, shutdownSignal, QUEUES } from '@aihot/backend/jobs/queue';
     import { registerContentJobs } from '@aihot/backend/jobs/content';
+    import { TRIAGE } from '@aihot/site';
+    TRIAGE.enabled = false;
     import { closeDb } from '@aihot/backend/db';
     QUEUES.analyze = process.env.TEST_ANALYZE_QUEUE;
     let stopping = false;

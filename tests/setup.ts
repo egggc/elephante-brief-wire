@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
 import { beijingAt } from "@aihot/contracts/time";
-import { EDITION_TIMES } from "@aihot/site";
+import { EDITION_TIMES, TRIAGE } from "@aihot/site";
 import { DEFAULTS, PRESETS } from "@aihot/site/models";
 
 const database = new URL(process.env.DATABASE_URL ?? "postgres://unset/unset").pathname.slice(1);
@@ -22,6 +22,9 @@ process.env.LOG_LEVEL ??= "error";
 // Paid providers are local stubs in these tests: calls and collection may run (the valves default off).
 process.env.MODEL_CALLS_ENABLED ??= "true";
 process.env.COLLECT_ENABLED ??= "true";
+// The tests of the per-item pipeline (what triage picks, editor picks and admin re-evaluations go through)
+// run it directly; tests/triage.test.ts turns batch triage back on.
+TRIAGE.enabled = false;
 // The tests were written against named model presets, one per step (each provider is pointed at a
 // local stub by the test that needs it). A step the site leaves on the `default` model gets its
 // preset here; tests/default-model.test.ts covers the default.
@@ -29,7 +32,7 @@ const STEP_MODELS: Record<string, [env: string, model: string]> = {
   prefilter: ["PREFILTER_MODEL", "qwen3.7-flash"], score: ["SCORE_MODEL", "glm-5.3-flash-selection"], understand: ["UNDERSTAND_MODEL", "glm-5.3-flash"],
   summarize: ["SUMMARIZE_MODEL", "deepseek-flash"], structure: ["STRUCTURE_MODEL", "qwen3.8-flash"], group: ["GROUP_MODEL", "deepseek-flash"],
   groupReview: ["GROUP_REVIEW_MODEL", "mimo-v2.6-flash"], digest: ["DIGEST_MODEL", "deepseek-flash"], report: ["REPORT_MODEL", "deepseek-flash"],
-  translate: ["TRANSLATE_MODEL", "deepseek-flash"],
+  translate: ["TRANSLATE_MODEL", "deepseek-flash"], triage: ["TRIAGE_MODEL", "deepseek-flash"],
 };
 for (const [step, [env, model]] of Object.entries(STEP_MODELS)) if (!DEFAULTS[step]) process.env[env] ??= model;
 

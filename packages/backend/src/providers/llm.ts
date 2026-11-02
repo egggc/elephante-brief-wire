@@ -6,7 +6,8 @@ import type { z } from "zod";
 import { PRESETS } from "@aihot/site/models";
 import { config, credential } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
-import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
+import { pingCreditRefusal } from "../operations/healthchecks.ts";
+import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse, type CallOutcome } from "./receipts.ts";
 
 export interface ModelSpec {
   key: string;
@@ -126,6 +127,26 @@ function isConnectFailure(error: unknown): boolean {
   return ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "UND_ERR_CONNECT_TIMEOUT", "CERT_HAS_EXPIRED"].includes(code ?? "");
 }
 
+/** A price in US dollars per million tokens, from the environment; null when unset or not a number. */
+function usdPerMillion(value: string | undefined): number | null {
+  const n = value?.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * What an answer cost: the provider's own figure when it gives one (OpenRouter's usage.cost, in US
+ * dollars), else for the default model its tokens at LLM_INPUT_USD_PER_M and LLM_OUTPUT_USD_PER_M
+ * (reasoning tokens are output tokens). Null when neither is known.
+ */
+export function answerCost(modelKey: string, usage: Record<string, unknown> | null): CallOutcome["cost"] {
+  if (!usage) return null;
+  if (typeof usage.cost === "number" && Number.isFinite(usage.cost)) return { amount: usage.cost, currency: "USD", basis: "actual" };
+  const input = usdPerMillion(process.env.LLM_INPUT_USD_PER_M), output = usdPerMillion(process.env.LLM_OUTPUT_USD_PER_M);
+  if (modelKey !== "default" || input === null || output === null) return null;
+  const tokens = (key: string) => (typeof usage[key] === "number" ? (usage[key] as number) : 0);
+  return { amount: (tokens("prompt_tokens") * input + tokens("completion_tokens") * output) / 1e6, currency: "USD", basis: "estimated" };
+}
+
 export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): Promise<ChatJsonResult<z.infer<S>>> {
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
@@ -189,10 +210,13 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
         response: { ...json, _latencyMs: Date.now() - started },
         requestId: (json.id as string | undefined) ?? res.headers.get("x-request-id"),
         usage,
-        cost: null,
+        cost: answerCost(spec.key, usage),
       };
     },
-  );
+  ).catch(async (error: unknown) => {
+    if (error instanceof ProviderRejectedError && (error.status === 402 || error.status === 403)) await pingCreditRefusal(spec.service, error.status, error.message);
+    throw error;
+  });
 
   const response = receipt.response as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Record<string, unknown> };
   const content = response.choices?.[0]?.message?.content ?? "";

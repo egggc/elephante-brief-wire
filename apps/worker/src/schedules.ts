@@ -19,11 +19,18 @@ import { recoverStaleWork } from "@aihot/backend/operations/recover";
 import { forwardPendingFeedback } from "@aihot/backend/operations/feedback";
 import { backupConfigured, runBackup } from "@aihot/backend/operations/backup";
 import { sourceHealthWeekly } from "@aihot/backend/operations/reports";
+import { triagePass } from "@aihot/backend/editorial/triage";
+import { TRIAGE } from "@aihot/site";
 
 const collecting = process.env.COLLECT_ENABLED === "true";
 
 const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
+  // Batch triage at each of site/site.ts TRIAGE.times: picks the stories to score and write up (model calls).
+  ...TRIAGE.times.map((time) => {
+    const [hour, minute] = time.split(":").map(Number);
+    return { name: `triage.${time.replace(":", "")}`, cron: `${minute} ${hour} * * *`, missed: "once" as const, run: () => triagePass(), when: () => TRIAGE.enabled };
+  }),
   // Full-text translations of newly selected items (model calls; off with MODEL_CALLS_ENABLED=false).
   { name: "content.translate", cron: "*/5 * * * *", run: () => translatePending() },
   { name: "hot.rank", cron: "*/5 * * * *", run: () => computeHotRanking() },

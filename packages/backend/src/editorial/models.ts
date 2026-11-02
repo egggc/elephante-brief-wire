@@ -19,8 +19,9 @@ export interface Capability {
 }
 
 export const CAPABILITIES = {
-  prefilter: { label: "Prefilter (does it belong here; broad recall)", env: "PREFILTER_MODEL", default: DEFAULTS.prefilter ?? "default", purposes: ["prefilter_article"] },
-  score: { label: "Selection score (two independent scores, held against the tier threshold)", env: "SCORE_MODEL", default: DEFAULTS.score ?? "default", purposes: ["score_article"] },
+  triage: { label: "Batch triage (twice a day: picks the stories worth a write-up from lists of headlines; site/site.ts TRIAGE)", env: "TRIAGE_MODEL", default: DEFAULTS.triage ?? "default", purposes: ["triage_batch"] },
+  prefilter: { label: "Prefilter (does it belong here; broad recall; with triage on, only items an editor selected or an admin re-evaluates)", env: "PREFILTER_MODEL", default: DEFAULTS.prefilter ?? "default", purposes: ["prefilter_article"] },
+  score: { label: "Selection score (held against the tier threshold)", env: "SCORE_MODEL", default: DEFAULTS.score ?? "default", purposes: ["score_article"] },
   understand: { label: "Content understanding (English and Chinese headlines, summaries and why-it-matters for selected and near-selected items; reads the first image when it can)", env: "UNDERSTAND_MODEL", default: DEFAULTS.understand ?? "default", purposes: ["understand_article"] },
   summarize: { label: "Headline and summary (English and Chinese, for the other items)", env: "SUMMARIZE_MODEL", default: DEFAULTS.summarize ?? "default", purposes: ["summarize_article"] },
   structure: { label: "Structure (category, tags, subjects, event facts and the claims ledger; no reader text)", env: "STRUCTURE_MODEL", default: DEFAULTS.structure ?? "default", purposes: ["structure_article"] },
